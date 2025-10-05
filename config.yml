@@ -1,0 +1,12 @@
+migrate:
+  config: true
+  data: true
+  excludes:
+  - assets
+  - data
+  - debug
+  - libraries
+  - logs
+  - PCL
+  filter_rule: excludes
+  screenshots: true

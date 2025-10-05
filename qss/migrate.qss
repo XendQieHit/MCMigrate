@@ -1,0 +1,139 @@
+QListWidget {
+    background-color: #ffffff;
+    border: none;
+}
+QListWidget.QScrollBar {
+    background: transparent;
+    width: 12px;
+    margin: 0px;
+    color: #A0A0A0;
+}
+QListWidget::item:selected {
+    background: "#bbdde7"
+}
+
+/* VersionItem 整体样式 */
+VersionItem {
+    background-color: white;
+    color: #333333;
+    border-radius: 8px;
+    padding: 8px;
+}
+
+/* Mod 加载器图标容器 */
+VersionItem > QLabel#mod_loader_icon {
+    background-color: #CDF0F1;
+    border-radius: 10px;
+    padding: 4px
+}
+
+/* 游戏名与非版本隔离提示容器 */
+QWidget#info_name {
+    font-size: 16px;
+    font-weight: bold;
+    color: #333333;
+}
+
+/* 版本类型 */
+QLabel#mod_loader_label {
+    font-size: 12px;
+    font-weight: bold;
+    color: '#ffffff';
+    background: '#57b37a';
+    padding: 3px;
+    border: none;
+    border-radius: 4px
+}
+
+/* 游戏名 */
+QLabel#name_label {
+    font-size: 14px;
+    color: #333333;
+}
+
+/* 非版本隔离提示 */
+QLabel#indie_label {
+    font-size: 12px;
+    font-weight: bold;
+    color: '#ffffff';
+    background: '#e7af46';
+    padding: 3px;
+    border: none;
+    border-radius: 4px
+}
+
+/* 版本与路径容器 */
+QWidget#info_detail {
+    font-size: 10px;
+    color: #999999;
+}
+
+/* 版本号 */
+QLabel#version_label {
+    font-size: 12px;
+    font-weight: bold;
+    color: '#ffffff';
+    background: '#46b7e7';
+    padding: 3px;
+    border: none;
+    border-radius: 4px
+}
+
+/* 路径 */
+QLabel#path_label {
+    font-size: 10px;
+    color: '#212121';
+    background: '#f3fbff';
+    padding: 3px;
+    border: none;
+    border-radius: 2px
+}
+
+/* 卡片信息容器 */
+QWidget#info {
+}
+
+/* debug显示组件边界 */
+/* QWidget {
+    border: 2px solid '#ff0000';
+} */
+
+QPushButton#button_migrate_detail {
+    background-color: '#78d599';
+    border: none;
+    border-radius: 35px; /* 圆形按钮 */
+    color: white;
+    font-size: 14px;
+    padding: 4px
+}
+QPushButton#button_migrate_detail:hover {
+    background-color: '#68c488'
+}
+
+QPushButton#button_import {
+    background-color: '#4B9CB2';
+    color: white;
+    padding: 10px;
+    border: none;
+    border-radius: 5px
+}
+QPushButton#button_import:hover {
+    background-color: '#56a8be'
+}
+QPushButton#button_import:pressed {
+    background-color: '#328197'
+}
+
+QPushButton#button_migrate {
+    background-color: '#4CAF50';
+    color: white;
+    padding: 10px;
+    border: none;
+    border-radius: 5px
+}
+QPushButton#button_migrate:hover {
+    background-color: '#5dc161'
+}
+QPushButton#button_migrate:pressed {
+    background-color: '#3ea041'
+}

@@ -1,0 +1,61 @@
+Forge:
+lib
+net.minecraftforge:forge:1.21.8-58.1.6
+(?<=(net\.minecraftforge:forge:)).*(?=-)
+
+Fabric:
+lib
+net.fabricmc:intermediary:1.20.4
+(?<=(net\.fabricmc:intermediary:)).*
+
+NeoForge:
+"arguments":{
+	"game":[
+		……
+		"--fmcccl.mcVersion",
+		"1.20.4",
+		……
+	]
+}
+
+Quilt:
+lib
+net.fabricmc:intermediary:1.20.4
+(?<=(net\.fabricmc:intermediary:)).*
+"libraries": [
+    {
+      "name": "org.quiltmc:……"
+    },
+]
+Optifine:
+lib
+optifine:OptiFine:1.21.8_HD_U_J6_pre16
+(?<=(optifine:OptiFine:)).*(?=_)
+
+Snapshot:
+"type":"snapshot"
+1.
+"currentVersion": "25w21a"
+2.
+json.get("patches", None)[0]["version"] = "1.21.9-rc1"
+
+else: Vanilla
+
+
+版本隔离
+
+PCL:
+PCL/Setup.ini
+VersionArgumentIndieV2:True
+
+HMCL：
+第一步，判断是否使用全局设置
+"usesGlobal": true
+if true: # 已使用
+# 算了，隔离和非隔离的都弄一份吧
+else: # 没有使用
+hmclversion.cfg
+"gameDirType": 1,
+0 -> Off 1 -> On
+
+

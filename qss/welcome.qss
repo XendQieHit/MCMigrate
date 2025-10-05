@@ -1,0 +1,14 @@
+QPushButton#button_import {
+    font-size: 20px;
+    background-color: '#4CAF50';
+    color: white;
+    padding: 20px;
+    border: none;
+    border-radius: 10px
+}
+QPushButton#button_import:hover {
+    background-color: '#5ec361'
+}
+QPushButton#button_import:pressed {
+    background-color: '#40a343'
+}
