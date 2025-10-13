@@ -1,10 +1,13 @@
 from pathlib import Path
 from typing import List
 import json, re, zipfile
-import logging
+import logging, Message
 
+# 设置日志
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+message = Message.Messageable(logger)
+
 
 def add_version(path: Path) -> list[dict] | None:
     # 检测是否是游戏文件夹
@@ -13,7 +16,7 @@ def add_version(path: Path) -> list[dict] | None:
         versions = parse_path(path)
         update_versions_json(versions)
         return versions
-    logger.warning("查找不到.minecraft或游戏文件夹，请检查是否正确选取导入")
+    logger.error("查找不到.minecraft或游戏文件夹，请检查是否正确选取导入")
     return None
     
 def update_versions_json(versions: list[dict]):

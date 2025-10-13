@@ -1,55 +1,43 @@
 from typing import List
 from pathlib import Path
-from PySide6 import QtWidgets
-import func.version, func.mod
+from PySide6 import QtWidgets, QtCore
+from Message import Messageable, Level
+import func.version, func.mod, func.config
 import os, requests, hashlib, yaml, shutil, json, re, zipfile, logging
 
 logging.basicConfig(level=logging.INFO)
 
-class Terminal():
+class Terminal(Messageable):
     def __init__(self, window: QtWidgets.QMainWindow):
+        super().__init__(__name__)
         self.config = {}
         self.is_migrating = False
         self.pending_num = 0
         self.window = window
-        if not os.path.exists('config.yml') or os.path.getsize('config.yml') <= 0:
-            with open('config.yml', 'w', encoding='utf-8') as f:
-                yaml.dump({
-                    'migrate':{
-                        'data': True,
-                        'screenshots': True,
-                        'config': True,
-                        'filter_rule': 'excludes',
-                        'excludes': [
-                            'assets',
-                            'data',
-                            'debug',
-                            'libraries',
-                            'logs',
-                            'NVIDIA',
-                            'PCL',
-                            'versions'
-                        ]
-                    }
-                }, f, allow_unicode=True, default_flow_style=False, indent=2)
-        with open('config.yml', 'r', encoding='utf-8') as f:
-            self.config = yaml.safe_load(f)
-
+        
     def migrate(self, source_json: dict, target_json: dict):
         source_dir = Path(source_json['game_path'])
         target_dir = Path(target_json['game_path'])
 
-        mod_list: List[str] = os.listdir(source_dir / "mods")
-        self.pending_num = len(mod_list) + len(os.listdir(source_dir))
-        
-        logging.info("下载mod中")
-        self.download_mods(source_dir / "mods", target_dir / "mods", target_json["version"], target_json["mod_loader"], mod_list)
-        logging.info("mod下载完成")
+        # 计算待处理任务数量（复制文件）
+        self.pending_num += len([dir for dir in os.listdir(source_dir) if dir not in list(func.config.get_config_value('migrate', 'excludes'))])
+
+        not_mod_loader = ['optifine', 'release', 'snapshot', 'unknown']
+        if (source_json['mod_loader'] not in not_mod_loader) and (target_json['mod_loader'] not in not_mod_loader):
+            mod_list: List[str] = os.listdir(source_dir / "mods")
+
+            # 计算待处理任务数量（mod下载）
+            self.pending_num += len(mod_list)
+            
+            # 开始下载mod
+            logging.info("下载mod中")
+            self.download_mods(source_dir / "mods", target_dir / "mods", target_json["version"], target_json["mod_loader"], mod_list)
+            logging.info("mod下载完成")
 
         logging.info("迁移游戏文件")
         self.migrate_file(source_dir, target_dir)
         logging.info("游戏文件迁移完成")
-        logging.info("已迁移完成")
+        self.message_requested.emit(f"{source_json.get('name')}已迁移至{target_json.get('name')}！", Level.Info)
 
     def migrate_file(self, source_dir: Path, target_dir: Path):
         for item in Path(source_dir).iterdir():
@@ -60,10 +48,9 @@ class Terminal():
                     shutil.copy(item, target_dir / item.name)
                 except PermissionError:
                     logging.warning("权限不足")
-                except Exception:
-                    logging.error("未知错误")
-            
-            self.pending -= 1
+                except Exception as e:
+                    logging.error("未知错误：" + e)
+            self.pending_num -= 1
             
     def download_mods(self, source_dir: str, target_dir: str, target_ver: str, mod_loader: str, file_name_list: List[str]):
         # 缓存，记录没有下载完成的mod

@@ -1,13 +1,40 @@
-import logging
+import logging, json, os
 from PySide6 import QtWidgets, QtGui, QtCore
 from Terminal import Terminal
 from pathlib import Path
-import Geometry, json, os
+import Geometry, Message
 
 logging.basicConfig(level=logging.INFO)
 
+# 消息弹窗
+class Messageable(QtWidgets.QFrame):
+    def __init__(self):
+        super().__init__()
+        self.message = Message.Message(parent_widget=self)
+        # 监听自身移动/缩放
+        self.move_timer = QtCore.QTimer()
+        self.move_timer.setSingleShot(True)
+        self.move_timer.timeout.connect(self._update_message_position)
+        
+    def _update_message_position(self):
+        """更新消息弹窗位置"""
+        if hasattr(self.message, 'current_message') and self.message.current_message:
+            msg_bar = self.message.current_message
+            if msg_bar.isVisible():
+                x = self.width() - msg_bar.width() - 20
+                y = 20
+                msg_bar.move(x, y)
+    
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.move_timer.start(50)  # 防抖
+        
+    def moveEvent(self, event):
+        super().moveEvent(event)
+        self.move_timer.start(50)
+
 # 欢迎界面
-class Welcome(QtWidgets.QFrame):
+class Welcome(Messageable):
     def __init__(self, terminal: Terminal):
         super().__init__()
         self.terminal = terminal
@@ -46,12 +73,13 @@ class Welcome(QtWidgets.QFrame):
                     versions = json.load(f)
                     migrate = Migrate(terminal=self.terminal, version_paths=versions)
                     self.terminal.window.setCentralWidget(migrate)
+                    self.message.done("版本导入成功！")
                 except:
                     logging.error("解析versions.json文件失败")
                     welcome = Welcome(terminal=self.terminal)
                     self.terminal.window.setCentralWidget(welcome)
 
-class Migrate(QtWidgets.QFrame):
+class Migrate(Messageable):
     def __init__(self, terminal: Terminal, version_paths: list[dict]):
         super().__init__()
         self.terminal = terminal
@@ -88,7 +116,6 @@ class Migrate(QtWidgets.QFrame):
         self.button_box.addWidget(self.button_import)
         self.button_box.addWidget(self.button_migrate)
         self.layout.addLayout(self.button_box)
-
         #
         self.setLayout(self.layout)
         self.resize(800, 400)
@@ -108,45 +135,28 @@ class Migrate(QtWidgets.QFrame):
             self.window().update()
 
     def button_migrate_clicked(self):
+        # 条件检测
         if self.terminal.is_migrating:
-            logging.info("请先等待迁移完成")
+            logging.info()
+            self.message.info("请先等待迁移完成")
             return
         ver_source: Migrate.VersionItem = self.ver_list_source.itemWidget(self.ver_list_source.currentItem())
         ver_target: Migrate.VersionItem = self.ver_list_target.itemWidget(self.ver_list_target.currentItem())
         if ver_source == None or ver_target == None:
             logging.info("请先选择迁移版本和目标版本")
+            self.message.info("请先选择迁移版本和目标版本")
             return
-
+        # 条件符合，开始迁移！
         self.terminal.migrate(source_json=ver_source.json, target_json=ver_target.json)
         
-        self.button_migrate_detail = QtWidgets.QPushButton(parent=self.parent())
-        self.button_migrate_detail.setObjectName('button_migrate_detail')
-        self.button_migrate_detail.setFixedSize(70, 70)
-        self.button_migrate_detail.setParent(self)
-        layout_detail = QtWidgets.QVBoxLayout()
-        self.button_migrate_detail.setLayout(layout_detail)
-        self.button_migrate_detail.setStyleSheet(load_stylesheet("qss/migrate.qss"))
-        self.button_migrate_detail.clicked.connect(self.button_migrate_detail_clicked)
-
-        self.ring = Geometry.LoadingRingText(QtGui.QColor("#EDFFFE"), QtGui.QColor("#EDFFFE"), parent=self.button_migrate_detail)
-        layout_detail.addWidget(self.ring, 1, QtCore.Qt.AlignCenter)
-        
-        self.percent_update_timer = QtCore.QTimer()
-        self.percent_update_timer.timeout.connect(lambda: self.percent_update(timer=self.percent_update_timer, ring=self.ring))
-        self.percent_update_timer.start(12)
-
-        self.button_migrate_detail.move(self.width() - 100, self.height() - 135)
-        self.button_migrate_detail.show()
-        self.button_migrate_detail.raise_()
+        # 添加任务详情悬浮按钮
+        self.button_migrate_detail = ButtonMigrateDetail(self)
     
     def percent_update(self, timer: QtCore.QTimer, ring: Geometry.LoadingRingText):
         ring.change_percent(self.terminal.pending_num)
         if self.terminal.pending_num == 0 and not self.terminal.is_migrating:
             timer.stop()
             timer.deleteLater()
-
-    def button_migrate_detail_clicked(self):
-        pass
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -268,10 +278,37 @@ class Migrate(QtWidgets.QFrame):
             for ver in versions:
                 self.add_version(Migrate.VersionItem(ver))
             logging.info("已更新版本列表")
+            
+class ButtonMigrateDetail(QtWidgets.QPushButton):
+    def __init__(self, terminal: Terminal, parent_widget=None):
+        super().__init__(self, parent_widget)
+        self.setObjectName('button_migrate_detail')
+        self.setFixedSize(70, 70)
+        self.setParent(self)
+        layout_detail = QtWidgets.QVBoxLayout()
+        self.setLayout(layout_detail)
+        self.setStyleSheet(load_stylesheet("qss/migrate.qss"))
+        self.clicked.connect(self.button_migrate_detail_clicked)
 
-class MigrateDetail(QtWidgets.QFrame):
+        self.ring = Geometry.LoadingRingText(QtGui.QColor("#EDFFFE"), QtGui.QColor("#EDFFFE"), parent=self)
+        layout_detail.addWidget(self.ring, 1, QtCore.Qt.AlignCenter)
+        
+        self.percent_update_timer = QtCore.QTimer()
+        self.percent_update_timer.timeout.connect(lambda: self.percent_update(timer=self.percent_update_timer, ring=self.ring))
+        self.percent_update_timer.start(12)
+
+        self.move(self.width() - 100, self.height() - 135)
+        self.show()
+        self.raise_()
+
+    def button_migrate_detail_clicked(self):
+        pass
+
+class MigrateDetail(Messageable):
     def __init__(self):
         super().__init__()
+    
+    def 
 
 def load_stylesheet(path):
     try:
