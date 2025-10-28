@@ -1,4 +1,3 @@
-# Message.py - 修改后的版本
 from PySide6 import QtWidgets, QtCore, QtGui
 from enum import Enum
 import sys, logging
@@ -6,8 +5,8 @@ import sys, logging
 class Level(Enum):
     INFO = (1, "#4fc2ef", "#f7f7f7")
     DONE = (2, "#5fd170", "#38413e")
-    WARNING = (3, "#e3ed4b", "#38413e")
-    ERROR = (4, "#e7612c", "#eaffe1")
+    WARNING = (3, "#fde351", "#56584B")
+    ERROR = (4, "#e7612c", "#ffffff")
     
     def __init__(self, num, color_bg, color_font):
         self.num = num
@@ -15,6 +14,9 @@ class Level(Enum):
         self.color_font = color_font
 
 class MessageBar(QtWidgets.QWidget):
+    '''
+    在窗口左上角弹出的消息弹幕
+    '''
     def __init__(self, msg: str, level: Level, parent_widget=None):
         super().__init__(parent_widget)
         self.main_window = parent_widget
@@ -30,7 +32,7 @@ class MessageBar(QtWidgets.QWidget):
         self.setLayout(layout)
         
         self.setStyleSheet(f"background: {level.color_bg}; border-radius: 4px;")
-        self.setFixedSize(250, 36)  # 固定大小，避免布局计算
+        self.setFixedSize(self.label.width()+10, 36)  # 固定大小，避免布局计算
         
         # 初始隐藏
         self.setWindowOpacity(0.0)
@@ -46,8 +48,6 @@ class MessageBar(QtWidgets.QWidget):
             x = self.main_window.width() - self.width() - 20
             y = 20
             self.move(x, y)
-        
-        self.show()
         
         self.show()
         
@@ -79,7 +79,7 @@ class MessageBar(QtWidgets.QWidget):
         if self.animations and self.animations.state() == QtCore.QAbstractAnimation.Running:
             return
             
-        fade_out = QtCore.QPropertyAnimation(self, b"Opacity")
+        fade_out = QtCore.QPropertyAnimation(self, b"windowOpacity")
         fade_out.setDuration(300)
         fade_out.setStartValue(1.0)
         fade_out.setEndValue(0.0)
@@ -97,16 +97,19 @@ class MessageBar(QtWidgets.QWidget):
         self.animations.addAnimation(slide_out)
         self.animations.start()
 
-
 class Message:
     '''
-    为前端设计的，能够显示消息弹窗的类
+    为前端设计的，能够显示消息弹幕的类
     '''
     def __init__(self, parent_widget=None):
         self.parent_widget = parent_widget
         self.current_message = None
         
     def show_message(self, msg: str, level: Level):
+        # 防止消息重叠，先删除未消失的消息弹幕
+        if self.current_message:
+            self.current_message.hide()
+            self.current_message.deleteLater()
         # 创建新消息
         self.current_message = MessageBar(msg, level, self.parent_widget)
         self.current_message.show_with_animation()
@@ -125,7 +128,7 @@ class Message:
 
 class Messageable(QtCore.QObject):
     '''
-    为后端设计的，能够向前端窗口发送消息弹窗的类
+    为后端设计的，能够向前端窗口发送消息弹幕的类
     '''
     message_requested = QtCore.Signal(str, Level) # 用于向前端窗口发送消息弹窗请求的Signal
     def __init__(self, logging_obj: str | logging.Logger):

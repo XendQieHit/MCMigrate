@@ -2,7 +2,7 @@ from typing import List
 from pathlib import Path
 from PySide6 import QtWidgets, QtCore
 from Message import Messageable, Level
-import func.version, func.mod, func.config
+from terminal.func import version, mod, config
 import os, requests, hashlib, yaml, shutil, json, re, zipfile, logging
 
 logging.basicConfig(level=logging.INFO)
@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO)
 class Terminal(Messageable):
     def __init__(self, window: QtWidgets.QMainWindow):
         super().__init__(__name__)
-        self.config = {}
+        self.config = config.get_config()
         self.is_migrating = False
         self.pending_num = 0
         self.window = window
@@ -19,8 +19,18 @@ class Terminal(Messageable):
         source_dir = Path(source_json['game_path'])
         target_dir = Path(target_json['game_path'])
 
+        # 路径检查
+        if source_dir == None or target_dir == None:
+            logging.info("请先选择迁移版本和目标版本")
+            self.message_requested.emit("请先选择迁移版本和目标版本", Level.INFO)
+            return
+        elif source_dir == target_dir:
+            self.message_requested.emit('不能迁移自己口牙>_<', Level.WARNING)
+            return
+        # 条件符合，开始迁移！
+
         # 计算待处理任务数量（复制文件）
-        self.pending_num += len([dir for dir in os.listdir(source_dir) if dir not in list(func.config.get_config_value('migrate', 'excludes'))])
+        self.pending_num += len([dir for dir in os.listdir(source_dir) if dir not in list(config.get_config_value('migrate', 'excludes'))])
 
         not_mod_loader = ['optifine', 'release', 'snapshot', 'unknown']
         if (source_json['mod_loader'] not in not_mod_loader) and (target_json['mod_loader'] not in not_mod_loader):
@@ -71,8 +81,8 @@ class Terminal(Messageable):
                 self.pending_num -= 1
                 continue
 
-            if not func.mod.modrinth(target_ver, mod_loader, source_dir, old_file_name, target_dir, not_adapt_mods):
-                if not func.mod.curseforge(target_ver, mod_loader, source_dir, old_file_name, target_dir, not_adapt_mods):
+            if not mod.modrinth(target_ver, mod_loader, source_dir, old_file_name, target_dir, not_adapt_mods):
+                if not mod.curseforge(target_ver, mod_loader, source_dir, old_file_name, target_dir, not_adapt_mods):
                     list.append(not_adapt_mods, old_file_name)
                     self.pending_num -= 1
                     continue
@@ -87,22 +97,22 @@ class Terminal(Messageable):
             os.remove(f"{target_dir}dl.txt")
     
     def add_version(self, path: Path) -> list[dict] | None:
-        return func.version.add_version(path)
+        return version.add_version(path)
         
     def update_versions_json(self, versions: list[dict]):
-        func.version.update_versions_json(versions)
+        version.update_versions_json(versions)
 
     def parse_path(self, path: Path) -> list[dict]:
-        return func.version.parse_path(path)
+        return version.parse_path(path)
     
     def is_indie_pcl(self, pcl_folder) -> bool:
-        return func.version.is_indie_pcl(pcl_folder)
+        return version.is_indie_pcl(pcl_folder)
         
     def is_indie_hmcl(self, hmcl_cfg_file) -> bool:
-        return func.version.is_indie_hmcl(hmcl_cfg_file)
+        return version.is_indie_hmcl(hmcl_cfg_file)
 
     def parse_version(self, path: Path, is_indie=True) -> dict | None:
-        return func.version.parse_version(path, is_indie)
+        return version.parse_version(path, is_indie)
 
     def get_versions(self) -> list[dict]:
-        return func.version.get_versions()
+        return version.get_versions()

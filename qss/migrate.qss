@@ -6,7 +6,7 @@ QListWidget.QScrollBar {
     background: transparent;
     width: 12px;
     margin: 0px;
-    color: #A0A0A0;
+    color: '#A0A0A0';
 }
 QListWidget::item:selected {
     background: "#bbdde7"
@@ -17,14 +17,14 @@ VersionItem {
     background-color: white;
     color: #333333;
     border-radius: 8px;
-    padding: 8px;
+    padding: 8px
 }
 
 /* Mod 加载器图标容器 */
 VersionItem > QLabel#mod_loader_icon {
     background-color: #CDF0F1;
     border-radius: 10px;
-    padding: 4px
+    margin: 5px 0px 5px 5px;
 }
 
 /* 游戏名与非版本隔离提示容器 */
@@ -136,4 +136,30 @@ QPushButton#button_migrate:hover {
 }
 QPushButton#button_migrate:pressed {
     background-color: '#3ea041'
+}
+
+QFrame#float_bar {
+    border-radius: 5px;
+    background-color: transparent;
+    padding: 0px
+}
+QFrame#float_bar > QPushButton#del_btn {
+    padding: 0px;
+    background-color: '#88d52d0f'
+}
+QFrame#float_bar > QPushButton#del_btn:hover {
+    background-color: '#dbe33a3d'
+}
+QFrame#float_bar > QPushButton#del_btn:pressed {
+    background-color: '#e4ce213e'
+}
+QFrame#float_bar > QPushButton#folder_btn {
+    padding: 0px;
+    background-color: '#92e9ba2e'
+}
+QFrame#float_bar > QPushButton#folder_btn:hover {
+    background-color: '#deffcf3e'
+}
+QFrame#float_bar > QPushButton#folder_btn:pressed {
+    background-color: '#dfc99b3e'
 }

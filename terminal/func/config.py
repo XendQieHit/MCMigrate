@@ -89,6 +89,15 @@ def gen_default_config():
     with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
         yaml.dump(default_config, f, allow_unicode=True, default_flow_style=False, indent=2)
 
+def get_config() -> dict:
+    if not config_exist():
+        gen_default_config()
+    try:
+        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+            return yaml.safe_load(f)
+    except Exception as e:
+        logger.error('读取配置文件时出现错误：' + e)
+
 def get_config_value(*keys: str) -> Any | None:
     """
     获取配置值，支持多级嵌套访问。

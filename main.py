@@ -1,6 +1,10 @@
 from PySide6 import QtCore, QtWidgets, QtGui
-import os, sys, json, Window, Terminal
+import os, sys, json
+from terminal.Terminal import Terminal
 import logging
+
+from windows.Migrate import Migrate
+from windows.Welcome import Welcome
 
 logging.basicConfig(level=logging.INFO)
 
@@ -12,7 +16,7 @@ window.setWindowIcon(QtGui.QIcon("assets/icon_64x64.png"))
 window.resize(800, 400)
 
 # 初始化 Terminal
-terminal = Terminal.Terminal(window)
+terminal = Terminal(window)
 
 # 连接 Terminal 的信号到窗口的消息系统
 def show_message_slot(msg: str, level):
@@ -27,16 +31,16 @@ if os.path.exists("versions.json") and os.path.getsize("versions.json") > 0:
     with open("versions.json", 'r', encoding='utf-8') as f:
         try:
             version_paths = json.load(f)
-            migrate = Window.Migrate(terminal=terminal, version_paths=version_paths)
+            migrate = Migrate(terminal=terminal, version_paths=version_paths)
             window.setCentralWidget(migrate)
             logging.info(migrate)
         except IOError:
             logging.error("解析versions.json文件失败")
-            welcome = Window.Welcome(terminal=terminal)
+            welcome = Welcome(terminal=terminal)
             window.setCentralWidget(welcome)
             logging.info(welcome)
 else:
-    welcome = Window.Welcome(terminal=terminal)
+    welcome = Welcome(terminal=terminal)
     window.setCentralWidget(welcome)
     logging.info(welcome)
 window.show()
