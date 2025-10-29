@@ -1,0 +1,32 @@
+#contentTextView {
+    border: none;
+    background-color: '#ffffff'
+}
+#contentTextView > QScrollBar {
+    background: transparent;
+    background-color: transparent;
+    width: 12px;
+    margin: 0px
+}
+
+#contentText {
+    background: transparent;
+    background-color: '#ffffff';
+    font-size: 14px;
+    border: none;
+    margin: 5px
+}
+
+#dialogWindow {
+    background-color: '#ffffff';
+    border-radius: 10px;
+    border: 2px solid '#7faaaaaa';
+    padding: 0px;
+    margin: 0px
+}
+
+#buttonSection {
+    background-color: '#ffffff';
+    border: none;
+    padding: 0px
+}

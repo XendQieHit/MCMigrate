@@ -4,7 +4,7 @@ import sys, logging
 
 class Level(Enum):
     INFO = (1, "#4fc2ef", "#f7f7f7")
-    DONE = (2, "#5fd170", "#38413e")
+    DONE = (2, "#73d877", "#000000")
     WARNING = (3, "#fde351", "#56584B")
     ERROR = (4, "#e7612c", "#ffffff")
     
@@ -27,7 +27,7 @@ class MessageBar(QtWidgets.QWidget):
         layout.setContentsMargins(1, 1, 1, 1)
         layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight)
         self.label = QtWidgets.QLabel(msg)
-        self.label.setStyleSheet(f"color: {level.color_font}; font-size: 14px; font-weight: bold; padding: 4px")
+        self.label.setStyleSheet(f"color: {level.color_font}; font-size: 14px; font-weight: light; padding: 4px")
         layout.addWidget(self.label)
         self.setLayout(layout)
         
@@ -128,7 +128,9 @@ class Message:
 
 class Messageable(QtCore.QObject):
     '''
-    为后端设计的，能够向前端窗口发送消息弹幕的类
+    为后端设计的，能够向前端窗口发送消息弹幕的类。
+    \n其message_requested信号需要将前端的Message类对象的show_message()方法connect()起来。
+    \n之后就可以通过该Messageable类的send_message方法传入内容来发送消息。
     '''
     message_requested = QtCore.Signal(str, Level) # 用于向前端窗口发送消息弹窗请求的Signal
     def __init__(self, logging_obj: str | logging.Logger):

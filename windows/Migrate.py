@@ -5,7 +5,7 @@ from terminal.Terminal import Terminal
 from pathlib import Path
 
 from windows.Messageable import Messageable
-import Message
+import Message, Dialog
 from windows.loadStyleSheet import load_stylesheet
 import windows
 import Geometry
@@ -182,15 +182,16 @@ class Migrate(Messageable):
             self.float_bar.setFixedSize(50, self.height()-10)
             super().resizeEvent(event)
         
+        # 悬浮工具栏的显示逻辑
         def enterEvent(self, event):
-            self.float_bar.move(self.list.viewport().width() - self.float_bar.width() - 10, 5)
-            self.float_bar.show()
+            self.float_bar.move(self.list.viewport().width() - self.float_bar.width() - 10 + self.list.h_scroll_value, 5)
+            self.float_bar.display_ui()
             self.list.hover_item = self
             super().enterEvent(event)
 
         def leaveEvent(self, event):
             self.list.hover_item = None
-            self.float_bar.hide()
+            self.float_bar.hide_ui()
             super().leaveEvent(event)
 
         def get_icon(self, mod_loader: str = None) -> QtWidgets.QLabel:
@@ -249,10 +250,14 @@ class Migrate(Messageable):
                 self.del_btn.setContentsMargins(0,0,0,0)
                 self.del_btn.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
                 self.del_btn.setToolTip('从列表中移除该版本（不会删除本体文件）')
+                self.del_btn.clicked.connect(self.delete_ver)
                 self.layout().addWidget(self.del_btn)
                 # icon
                 self.del_btn.setIcon(QtGui.QIcon('assets/delete.svg'))
 
+                self.opacity_effect = QtWidgets.QGraphicsOpacityEffect(self)
+                self.opacity_effect.setOpacity(0.0)
+                self.setGraphicsEffect(self.opacity_effect)
                 self.hide()
 
             def open_folder(self):
@@ -262,26 +267,32 @@ class Migrate(Messageable):
                     self.parent_item.list.parent().message.error('无法打开文件夹，可能版本文件夹本体已被删除！')
             
             def delete_ver(self):
-                pass
+                print(1)
+                def delete(dialog):
+                    self.parent_item.list.parent().message.done("已成功移除 ！")
+                    dialog.close_and_delete()
+                dialog: Dialog.DialogWindow = self.parent_item.list.parent().dialog.done(
+                    "确定要从列表中移除该版本吗？",
+                    "在列表中移除该版本不会对游戏文件产生影响。",
+                    ("确定", lambda: delete(dialog), Dialog.Level.ERROR)
+                )
 
-            @DeprecationWarning
+
             def display_ui(self):
-                effect = self.graphicsEffect()
-                anim = QtCore.QPropertyAnimation(effect, b"opacity")
-                anim.setDuration(300)
-                anim.setStartValue(effect.opacity())
-                anim.setEndValue(1.0)
-                anim.start()
+                self.show()
+                self.anim = QtCore.QPropertyAnimation(self.graphicsEffect(), b"opacity")
+                self.anim.setDuration(60)
+                self.anim.setStartValue(self.graphicsEffect().opacity())
+                self.anim.setEndValue(1.0)
+                self.anim.start()
 
-            @DeprecationWarning
             def hide_ui(self):
-                effect = self.graphicsEffect()
-                anim = QtCore.QPropertyAnimation(effect, b"opacity")
-                anim.setDuration(300)
-                anim.setStartValue(effect.opacity())
-                anim.setEndValue(0.0)
-                anim.finished.connect(self.hide)
-                anim.start()
+                self.anim = QtCore.QPropertyAnimation(self.graphicsEffect(), b"opacity")
+                self.anim.setDuration(60)
+                self.anim.setStartValue(self.graphicsEffect().opacity())
+                self.anim.setEndValue(0.0)
+                self.anim.finished.connect(self.hide)
+                self.anim.start()
                 self.show()  # 确保在动画期间可见
 
 
@@ -296,6 +307,7 @@ class Migrate(Messageable):
 
             # 通过监听滑条移动来动态调整实现VersionItem的FloatBar工具栏与列表相对静止
             self.hover_item: Migrate.VersionItem = None
+            self.h_scroll_value = 0
             self.scroll_max = self.horizontalScrollBar().maximum()
             self.scroll_pagestep = self.horizontalScrollBar().pageStep()
             print(self.scroll_max, self.scroll_pagestep, self.horizontalScrollBar().value())
@@ -304,6 +316,7 @@ class Migrate(Messageable):
         
         # 保持水平移动列表时，悬浮工具栏仍可以相对固定列表靠右处
         def on_scroll(self, value: int):
+            self.h_scroll_value = value
             if self.hover_item:
                 self.hover_item.float_bar.move(self.viewport().width() - self.hover_item.float_bar.width() - 10 + value, 5)
         
