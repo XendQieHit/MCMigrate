@@ -4,7 +4,7 @@ import sys, logging
 
 class Level(Enum):
     INFO = (1, "#4fc2ef", "#f7f7f7")
-    DONE = (2, "#73d877", "#000000")
+    DONE = (2, "#39C42C", "#f7f7f7")
     WARNING = (3, "#fde351", "#56584B")
     ERROR = (4, "#e7612c", "#ffffff")
     
@@ -23,13 +23,12 @@ class MessageBar(QtWidgets.QWidget):
         self.level = level
         
         # init
-        layout = QtWidgets.QHBoxLayout() # 增加一些内边距
-        layout.setContentsMargins(1, 1, 1, 1)
-        layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight)
+        self.setLayout(QtWidgets.QHBoxLayout())
+        self.layout().setContentsMargins(1, 1, 1, 1)
+        self.layout().setAlignment(QtCore.Qt.AlignmentFlag.AlignRight)
         self.label = QtWidgets.QLabel(msg)
-        self.label.setStyleSheet(f"color: {level.color_font}; font-size: 14px; font-weight: light; padding: 4px")
-        layout.addWidget(self.label)
-        self.setLayout(layout)
+        self.label.setStyleSheet(f"color: {level.color_font}; font-size: 14px; font-weight: bold; padding: 4px")
+        self.layout().addWidget(self.label)
         
         self.setStyleSheet(f"background: {level.color_bg}; border-radius: 4px;")
         self.setFixedSize(self.label.width()+10, 36)  # 固定大小，避免布局计算
@@ -43,6 +42,7 @@ class MessageBar(QtWidgets.QWidget):
     def show_with_animation(self):
         """显示并播放进入动画"""
         # 如果有父窗口，定位到父窗口右上角
+        print(1, self)
         if self.main_window:
             # 定位到主窗口右上角（内部坐标）
             x = self.main_window.width() - self.width() - 20
@@ -75,6 +75,7 @@ class MessageBar(QtWidgets.QWidget):
         QtCore.QTimer.singleShot(3000, self.hide_with_animation)
         
     def hide_with_animation(self):
+        print(2)
         """播放退出动画并隐藏"""
         if self.animations and self.animations.state() == QtCore.QAbstractAnimation.Running:
             return
@@ -106,14 +107,17 @@ class Message:
         self.current_message = None
         
     def show_message(self, msg: str, level: Level):
+        self.show_message_bar(MessageBar(msg=msg, level=level, parent_widget=self.parent_widget))
+
+    def show_message_bar(self, msg_bar: MessageBar):
         # 防止消息重叠，先删除未消失的消息弹幕
         if self.current_message:
             self.current_message.hide()
             self.current_message.deleteLater()
         # 创建新消息
-        self.current_message = MessageBar(msg, level, self.parent_widget)
+        self.current_message = msg_bar
         self.current_message.show_with_animation()
-        
+
     def info(self, msg: str):
         self.show_message(msg, Level.INFO)
         

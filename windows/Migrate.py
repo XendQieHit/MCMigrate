@@ -1,4 +1,4 @@
-import logging
+import logging, json
 from PySide6 import QtWidgets, QtGui, QtCore
 from PySide6.QtSvgWidgets import QSvgWidget
 from terminal.Terminal import Terminal
@@ -13,6 +13,7 @@ import Geometry
 class Migrate(Messageable):
     def __init__(self, terminal: Terminal, version_paths: list[dict]):
         super().__init__()
+        self.versions = version_paths
         self.terminal = terminal
         self.setWindowTitle("MCMigrator")
         self.setWindowIcon(QtGui.QIcon("assets/icon_64x64.png"))
@@ -62,6 +63,7 @@ class Migrate(Messageable):
         if path == Path("."): return
         if self.terminal.add_version(path):
             versions = self.terminal.get_versions()
+            self.versions = versions
             self.ver_list_source.update_versions(versions)
             self.ver_list_target.update_versions(versions)
             self.window().update()
@@ -176,7 +178,7 @@ class Migrate(Messageable):
             self.info_detail_layout.addStretch()
 
             # 悬浮操作栏
-            self.float_bar = Migrate.VersionItem.FloatBar(self)
+            self.float_bar = Migrate.VersionItem.FloatBar(self, self.list.parent())
 
         def resizeEvent(self, event): # 这里存放根据卡片大小来确定自身大小的widget
             self.float_bar.setFixedSize(50, self.height()-10)
@@ -218,9 +220,10 @@ class Migrate(Messageable):
             return label
         
         class FloatBar(QtWidgets.QFrame):
-            def __init__(self, parent_widget: 'Migrate.VersionItem'):
+            def __init__(self, parent_widget: 'Migrate.VersionItem', main_window: 'Migrate'):
                 super().__init__(parent_widget)
                 self.parent_item = parent_widget
+                self.main_window = main_window
                 # 总样式设置
                 self.setLayout(QtWidgets.QVBoxLayout())
                 self.setContentsMargins(0,0,0,0)
@@ -264,19 +267,52 @@ class Migrate(Messageable):
                 if Path.exists(Path(self.parent_item.path.text())):
                     QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(self.parent_item.path.text()))
                 else:
-                    self.parent_item.list.parent().message.error('无法打开文件夹，可能版本文件夹本体已被删除！')
+                    self.main_window.message.error('无法打开文件夹，可能版本文件夹本体已被删除！')
             
             def delete_ver(self):
-                print(1)
-                def delete(dialog):
-                    self.parent_item.list.parent().message.done("已成功移除 ！")
-                    dialog.close_and_delete()
-                dialog: Dialog.DialogWindow = self.parent_item.list.parent().dialog.done(
+                def delete(dialog: Dialog.DialogWindow):
+                    try:
+                        # 从列表中移除目标条目
+                        try:
+                            self.main_window.versions.remove(self.parent_item.json)
+                        except ValueError:
+                            self.main_window.message.info("未在列表中找到该版本，已跳过移除。")
+                            dialog.close_with_animation()
+                            return
+
+                        # 写回文件
+                        with Path('versions.json').open('w', encoding='utf-8') as f:
+                            json.dump(self.main_window.versions, f, ensure_ascii=False, indent=2)
+
+                        # 如果全删完了，就切换为欢迎界面
+                        if self.main_window.versions == []:
+                            self.main_window.terminal.switch_window(Terminal.WindowEnum.WELCOME, ("已成功移除 ！", Message.Level.DONE))
+                            dialog.close_with_animation()
+                            
+                        # 更新界面列表（同时更新源和目标列表）
+                        try:
+                            self.main_window.ver_list_source.update_versions(self.main_window.versions)
+                            self.main_window.ver_list_target.update_versions(self.main_window.versions)
+                        except Exception:
+                            logging.exception("更新版本列表 UI 时出错")
+
+                    except (OSError, IOError) as e:
+                        logging.exception("文件操作失败")
+                        self.main_window.message.error(f"文件操作失败：{e}")
+                    except json.JSONDecodeError as e:
+                        logging.exception("JSON 解析失败")
+                        self.main_window.message.error(f"读取版本列表失败：{e}")
+                    except Exception as e:
+                        logging.exception("移除版本时发生未知错误")
+                        self.main_window.message.error(f"移除版本失败：{e}")
+
+                    self.main_window.message.done("已成功移除 ！")
+                    dialog.close_with_animation()
+                dialog: Dialog.DialogWindow = self.main_window.dialog.warning(
                     "确定要从列表中移除该版本吗？",
                     "在列表中移除该版本不会对游戏文件产生影响。",
-                    ("确定", lambda: delete(dialog), Dialog.Level.ERROR)
+                    ("确定", Dialog.Level.ERROR, lambda: delete(dialog))
                 )
-
 
             def display_ui(self):
                 self.show()
@@ -329,7 +365,7 @@ class Migrate(Messageable):
         def update_versions(self, versions: list[dict]):
             self.clear()
             for ver in versions:
-                self.add_version(Migrate.VersionItem(ver))
+                self.add_version(Migrate.VersionItem(ver, self))
             logging.info("已更新版本列表")
             
 class ButtonMigrateDetail(QtWidgets.QPushButton):

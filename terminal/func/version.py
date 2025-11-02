@@ -1,12 +1,13 @@
 from pathlib import Path
 from typing import List
 import json, re, zipfile
-import logging, Message
+import logging, Message, Dialog, MCException
 
 # 设置日志
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 message = Message.Messageable(logger)
+dialog = Dialog.Dialogable()
 
 
 def add_version(path: Path) -> list[dict] | None:
@@ -16,8 +17,7 @@ def add_version(path: Path) -> list[dict] | None:
         versions = parse_path(path)
         update_versions_json(versions)
         return versions
-    logger.error("查找不到.minecraft或游戏文件夹，请检查是否正确选取导入")
-    return None
+    raise MCException.NotMCGameFolder()
     
 def update_versions_json(versions: list[dict]):
     if not versions:
@@ -48,6 +48,7 @@ def update_versions_json(versions: list[dict]):
 
 def parse_path(path: Path) -> list[dict]:
     versions = []
+    failed_versions = []
     path_versions = Path(path / 'versions')
     if path_versions.exists():
         logger.info("找到versions文件夹，开始逐个解析版本")
@@ -81,14 +82,24 @@ def parse_path(path: Path) -> list[dict]:
                     versions.append(parse_version(p, True))
                     versions.append(parse_version(p, False))
     else: 
-        logger.warning("未发现versions文件夹，还没下游戏吗...?")
+        message.send_message("未发现versions文件夹，还没下游戏吗...?", Message.Level.WARNING)
 
+    # 汇总一下哪些版本导入失败
     filtered_versions = []
     for item in versions:
         if item:
             filtered_versions.append(item)
         else:
             logger.error(f"导入{item}失败")
+            failed_versions.append(item)
+    if failed_versions != []:
+        dialog.send_dialog(
+            "以下版本无法导入", 
+            Dialog.Level.WARNING, 
+            '\n'.join([item for item in failed_versions]), 
+            None
+        )
+    
     return filtered_versions
 
 def is_indie_pcl(pcl_folder) -> bool:

@@ -172,6 +172,6 @@ if __name__ == "__main__":
     window = QtWidgets.QMainWindow()
     terminal = Terminal(window)
     md = MigrateDetail(terminal=terminal)
-    terminal.window.setCentralWidget(md)
-    terminal.window.show()
+    terminal.main_window.setCentralWidget(md)
+    terminal.main_window.show()
     sys.exit(app.exec())

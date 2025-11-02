@@ -1,20 +1,29 @@
+from enum import Enum
 from typing import List
 from pathlib import Path
 from PySide6 import QtWidgets, QtCore
-from Message import Messageable, Level
+import Message, Dialog
 from terminal.func import version, mod, config
 import os, requests, hashlib, yaml, shutil, json, re, zipfile, logging
 
 logging.basicConfig(level=logging.INFO)
 
-class Terminal(Messageable):
-    def __init__(self, window: QtWidgets.QMainWindow):
+class Terminal(Message.Messageable, Dialog.Dialogable):
+    def __init__(self, main_window: QtWidgets.QMainWindow):
         super().__init__(__name__)
         self.config = config.get_config()
         self.is_migrating = False
         self.pending_num = 0
-        self.window = window
-        
+        self.main_window = main_window
+
+    def switch_window(self, window_enum: 'WindowEnum', msg_bar: tuple[str, Message.Level], *params):
+        # 切换窗口界面
+        self.main_window.setCentralWidget(window_enum.clazz(self, *params))
+
+        # 发送预留消息
+        if msg_bar and hasattr(self.main_window.centralWidget(), 'message'):
+            self.send_message(*msg_bar)
+
     def migrate(self, source_json: dict, target_json: dict):
         source_dir = Path(source_json['game_path'])
         target_dir = Path(target_json['game_path'])
@@ -22,10 +31,10 @@ class Terminal(Messageable):
         # 路径检查
         if source_dir == None or target_dir == None:
             logging.info("请先选择迁移版本和目标版本")
-            self.message_requested.emit("请先选择迁移版本和目标版本", Level.INFO)
+            self.message_requested.emit("请先选择迁移版本和目标版本", Message.Level.INFO)
             return
         elif source_dir == target_dir:
-            self.message_requested.emit('不能迁移自己口牙>_<', Level.WARNING)
+            self.message_requested.emit('不能迁移自己口牙>_<', Message.Level.WARNING)
             return
         # 条件符合，开始迁移！
 
@@ -47,7 +56,7 @@ class Terminal(Messageable):
         logging.info("迁移游戏文件")
         self.migrate_file(source_dir, target_dir)
         logging.info("游戏文件迁移完成")
-        self.message_requested.emit(f"{source_json.get('name')}已迁移至{target_json.get('name')}！", Level.Info)
+        self.message_requested.emit(f"{source_json.get('name')}已迁移至{target_json.get('name')}！", Message.Level.Info)
 
     def migrate_file(self, source_dir: Path, target_dir: Path):
         for item in Path(source_dir).iterdir():
@@ -116,3 +125,20 @@ class Terminal(Messageable):
 
     def get_versions(self) -> list[dict]:
         return version.get_versions()
+    
+
+    class WindowEnum(Enum):
+        '''
+        作为一个中介，来让各个窗口可以调用其他窗口（其实主要是防止循环导入）
+        '''
+        WELCOME = "windows.Welcome.Welcome"
+        MIGRATE = "windows.Migrate.Migrate"
+        MIGRATE_DETAIL = "windows.MigrateDetail.MigrateDetail"
+
+        @property
+        def clazz(self):
+            # 延迟导入：只有访问 .clazz 时才导入
+            import importlib
+            module_path, class_name = self.value.rsplit('.', 1)
+            module = importlib.import_module(module_path)
+            return getattr(module, class_name)

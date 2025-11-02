@@ -2,18 +2,20 @@ from PySide6 import QtWidgets, QtCore, QtGui
 from typing import Callable, Dict
 from enum import Enum
 import sys, logging
+from PIL import ImageColor
 from windows.loadStyleSheet import load_stylesheet
 
 class Level(Enum):
-    INFO = (1, "#7bccff", "#7bccffc1", "#f7f7f7")
-    DONE = (2, "#80eb83", "#80eb83c1",  "#38413e")
-    WARNING = (3, "#f6e16a", "#f6e16ac1", "#000000")
-    ERROR = (4, "#e7612c", "#e7612cc1", "#ffffff")
+    INFO = (1, "#7bccff", "#34566c5f", "#7bccff2b", "#ffffff")
+    DONE = (2, "#80eb83", "#3068325f", "#80eb832d",  "#38413e")
+    WARNING = (3, "#f6e16a", "#8a7d335f", "#f6e16a2d", "#000000")
+    ERROR = (4, "#e7612c", "#981b0d5f", "#e7612c2d", "#ffffff")
     
-    def __init__(self, num, color, color_bg, color_font):
+    def __init__(self, num, color, color_bg, color_btn, color_font):
         self.num = num
         self.color = color
         self.color_bg = color_bg
+        self.color_btn = color_btn
         self.color_font = color_font
 
 class DialogWindow(QtWidgets.QWidget):
@@ -26,13 +28,12 @@ class DialogWindow(QtWidgets.QWidget):
         level: Level,
         content_text: str,
         parent_widget: QtWidgets.QWidget,
-        *buttons: tuple[str, Callable[[], None], Level]
+        *buttons: tuple[str, Level, Callable[[], None]]
     ):
         super().__init__(parent=parent_widget)
         self.parent_widget = parent_widget
         
-        # 设置为无边框对话框，支持透明
-        self.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.Dialog)
+        # 设置窗口支持透明
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
         
         # 设置自身大小为主窗口大小（作为遮罩容器）
@@ -41,13 +42,12 @@ class DialogWindow(QtWidgets.QWidget):
         # 背景遮罩（全屏半透明）
         self.background = QtWidgets.QFrame(self)
         self.background.setGeometry(0, 0, self.width(), self.height())  # 全屏
-        self.background.setStyleSheet("background-color: rgba(0, 0, 0, 0.3);")
-
-        # 对话框内容
+        self.background.setStyleSheet(f"background-color: rgba{ImageColor.getcolor(level.color_bg, "RGBA")}")
+        
+        # 对话框
         self.dialog_window = QtWidgets.QWidget(self)
-        self.dialog_window.setFixedSize(500, 260)
-
-        # 设置对话框样式
+        self.dialog_window.setFixedSize(500, 240)
+        self.dialog_window.setObjectName("dialogWindow")
         self.dialog_window.setStyleSheet(load_stylesheet("qss/dialog.qss"))
         self.dialog_window.setLayout(QtWidgets.QVBoxLayout())
         self.dialog_window.layout().setSpacing(5)
@@ -80,63 +80,67 @@ class DialogWindow(QtWidgets.QWidget):
         self.button_section.layout().setAlignment(QtCore.Qt.AlignmentFlag.AlignRight)
         self.button_section.setObjectName("buttonSection")
         self.button_section.setStyleSheet(load_stylesheet('qss/dialog.qss'))
-        
-        for button in buttons:
-            btn = QtWidgets.QPushButton(button[0], self.button_section)
-            btn.setStyleSheet(f"border: 2px solid {button[2].color}; border-radius: 5px; font-size: 16px; color: {button[2].color}; padding: 2px")
-            btn.clicked.connect(button[1])
-            self.button_section.layout().addWidget(btn)
+        self.dialog_window.layout().addWidget(self.button_section, 0)
+        # 添加按钮
+        if buttons:
+            for button in buttons:
+                self.button_section.layout().addWidget(DialogWindow.DialogButton(button[0], button[1], button[2]))
         
         # 取消按钮
-        self.button_cancel = QtWidgets.QPushButton('取消', self.button_section)
-        self.button_cancel.setStyleSheet(f"border: 2px solid {Level.INFO.color}; border-radius: 5px; font-size: 16px; color: {Level.INFO.color}; padding: 2px")
-        self.button_cancel.clicked.connect(self.close_and_delete)
+        self.button_cancel = DialogWindow.DialogButton('取消', Level.INFO, self.close_with_animation)
         self.button_section.layout().addWidget(self.button_cancel)
-        
-        self.dialog_window.layout().addWidget(self.button_section)
 
-        # 先隐藏
-        self.setWindowOpacity(0.0)
-
-    def showEvent(self, event):
-        super().showEvent(event)
-        print(2)
+        # 准备动画展示，先隐藏界面
+        self.effect_opacity = QtWidgets.QGraphicsOpacityEffect(opacity=0.0)
+        self.setGraphicsEffect(self.effect_opacity)
 
     def show_with_animation(self):
         self.show()
 
-        # 1. 背景遮罩和整个对话框容器淡入（透明度动画）
-        fade_in = QtCore.QPropertyAnimation(self, b"windowOpacity")
-        fade_in.setDuration(300)
-        fade_in.setStartValue(0.0)
-        fade_in.setEndValue(1.0)
-        fade_in.setEasingCurve(QtCore.QEasingCurve.InOutQuad)
-
-        # 2. 内部对话框（dialog_window）缩放动画
         # 先将其移到中心，并设为 0 大小
         center = self.rect().center()
         self.dialog_window.move(center.x() - 250, center.y() - 120)  # 初始位置（目标中心）
         self.dialog_window.resize(0, 0)  # 从 0 开始
         self.dialog_window.show()
 
-        scale_anim = QtCore.QPropertyAnimation(self.dialog_window, b"geometry")
-        scale_anim.setDuration(4000)
-        scale_anim.setStartValue(QtCore.QRect(center.x() - 250, center.y() - 120, 0, 0))
-        scale_anim.setEndValue(QtCore.QRect(center.x() - 250, center.y() - 120, 500, 240))
-        scale_anim.setEasingCurve(QtCore.QEasingCurve.OutCubic)
+        # 透明度动画
+        self.anim_fade_in = QtCore.QPropertyAnimation(self.graphicsEffect(), b"opacity")
+        self.anim_fade_in.setDuration(300)
+        self.anim_fade_in.setStartValue(0.0)
+        self.anim_fade_in.setEndValue(1.0)
+        self.anim_fade_in.setEasingCurve(QtCore.QEasingCurve.InOutQuad)
 
-        # 3. 并行动画：淡入 + 缩放
-        group = QtCore.QParallelAnimationGroup()
-        group.addAnimation(fade_in)
-        group.addAnimation(scale_anim)
-        group.start()
+        self.anim_fade_in.start()
+    
+    def close_with_animation(self):
+        self.anim_fade_in = QtCore.QPropertyAnimation(self.graphicsEffect(), b"opacity")
+        self.anim_fade_in.setDuration(100)
+        self.anim_fade_in.setStartValue(self.graphicsEffect().opacity())
+        self.anim_fade_in.setEndValue(0.0)
+        self.anim_fade_in.setEasingCurve(QtCore.QEasingCurve.InOutQuad)
+        self.anim_fade_in.finished.connect(self.close)
+        self.anim_fade_in.start()
+    
+    class DialogButton(QtWidgets.QPushButton):
+        def __init__(self, text: str, level: Level, func: Callable[[], None]):
+            super().__init__(text)
+            self.color_bg = ImageColor.getcolor(level.color_btn, "RGBA")
+            self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+            self.setStyleSheet(f"""
+                QPushButton {{
+                    border: 2px solid {level.color};
+                    border-radius: 5px;
+                    font-size: 16px;
+                    background-color: transparent;
+                    color: {level.color};
+                    padding: 2px
+                }}
+                QPushButton:hover {{
+                    background-color: rgba{self.color_bg}
+                }}
+            """)
+            self.clicked.connect(func)
 
-        # 防止动画被垃圾回收
-        self._animation_group = group
-
-    def close_and_delete(self):
-        self.close()
-        self.deleteLater()
 
 class Dialog:
     '''
@@ -148,7 +152,9 @@ class Dialog:
 
     def show_dialog(self, title: str, level: Level, content_text: str, *buttons):
         if self.current_dialog:
-            self.current_dialog.close_and_delete()
+            self.current_dialog.close()
+            self.current_dialog.deleteLater()
+            self.current_dialog = None
         self.current_dialog = DialogWindow(title, level, content_text, self.parent_widget, *buttons)
         self.current_dialog.show_with_animation()
         return self.current_dialog
@@ -164,22 +170,11 @@ class Dialog:
 
     def done(self, title: str, content_text: str, *buttons):
         return self.show_dialog(title, Level.DONE, content_text, *buttons)
+    
+class Dialogable(QtCore.QObject):
+    dialog_requested = QtCore.Signal(str, Level, str, *tuple[str, Level, Callable[[], None]])
+    def __init__(self):
+        super().__init__()
 
-
-if __name__ == '__main__':
-    app = QtWidgets.QApplication([])
-    window = QtWidgets.QMainWindow()
-    window.resize(800, 400)
-    window.setLayout(QtWidgets.QHBoxLayout())
-    frame = QtWidgets.QFrame()
-    window.setCentralWidget(frame)
-    window.show()
-
-    dialog = Dialog(parent_widget=frame)
-    dialog.show_dialog(
-        '111',
-        Level.WARNING,
-        'SBQt，换行还要有空格分开才能正确换行，如果是11111111111111111111111111111111这样就是不能分了，那我要你换行干什么😅\n你说得对，但是qt开发者小时候写英语作业，听老师说单词不够遇到空格要换行，所以语文作文写作文时直接整一行写过去，结果就被语文老师打断了双腿\n所以语文作文写作文时直接整一行写过去，结果就被语文老师打断了双腿\n所以语文作文写作文时直接整一行写过去，结果就被语文老师打断了双腿\n所以语文作文写作文时直接整一行写过去，结果就被语文老师打断了双腿\n所以语文作文写作文时直接整一行写过去，结果就被语文老师打断了双腿\n所以语文作文写作文时直接整一行写过去，结果就被语文老师打断了双腿\n所以语文作文写作文时直接整一行写过去，结果就被语文老师打断了双腿\n所以语文作文写作文时直接整一行写过去，结果就被语文老师打断了双腿\n所以语文作文写作文时直接整一行写过去，结果就被语文老师打断了双腿\n所以语文作文写作文时直接整一行写过去，结果就被语文老师打断了双腿\n所以语文作文写作文时直接整一行写过去，结果就被语文老师打断了双腿\n所以语文作文写作文时直接整一行写过去，结果就被语文老师打断了双腿\n所以语文作文写作文时直接整一行写过去，结果就被语文老师打断了双腿\n所以语文作文写作文时直接整一行写过去，结果就被语文老师打断了双腿\n所以语文作文写作文时直接整一行写过去，结果就被语文老师打断了双腿\n所以语文作文写作文时直接整一行写过去，结果就被语文老师打断了双腿\n所以语文作文写作文时直接整一行写过去，结果就被语文老师打断了双腿\n所以语文作文写作文时直接整一行写过去，结果就被语文老师打断了双腿\n所以语文作文写作文时直接整一行写过去，结果就被语文老师打断了双腿\n所以语文作文写作文时直接整一行写过去，结果就被语文老师打断了双腿\n所以语文作文写作文时直接整一行写过去，结果就被语文老师打断了双腿\n所以语文作文写作文时直接整一行写过去，结果就被语文老师打断了双腿\n所以语文作文写作文时直接整一行写过去，结果就被语文老师打断了双腿\n所以语文作文写作文时直接整一行写过去，结果就被语文老师打断了双腿\n所以语文作文写作文时直接整一行写过去，结果就被语文老师打断了双腿\n所以语文作文写作文时直接整一行写过去，结果就被语文老师打断了双腿\n所以语文作文写作文时直接整一行写过去，结果就被语文老师打断了双腿\n所以语文作文写作文时直接整一行写过去，结果就被语文老师打断了双腿\n所以语文作文写作文时直接整一行写过去，结果就被语文老师打断了双腿\n所以语文作文写作文时直接整一行写过去，结果就被语文老师打断了双腿',
-         ('111', lambda: print('111'), Level.ERROR))
-
-    sys.exit(app.exec())
+    def send_dialog(self, title: str, level: Level, content_text: str, *buttons):
+        self.dialog_requested.emit(title, level, content_text, *buttons)

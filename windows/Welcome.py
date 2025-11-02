@@ -6,7 +6,7 @@ from pathlib import Path
 
 from windows.loadStyleSheet import load_stylesheet
 from windows.Messageable import Messageable
-from windows.Migrate import Migrate
+import Message, MCException
 
 # 欢迎界面
 class Welcome(Messageable):
@@ -30,7 +30,7 @@ class Welcome(Messageable):
         self.button_import.setObjectName('button_import')
         self.button_import.clicked.connect(self.button_import_clicked)
         self.button_import.resize(200, 60)
-        self.button_import.setStyleSheet(self.load_stylesheet("qss/welcome.qss"))
+        self.button_import.setStyleSheet(load_stylesheet("qss/welcome.qss"))
         self.layout.addWidget(self.button_import, 1, QtCore.Qt.AlignCenter)
         self.resize(800, 400)
 
@@ -41,16 +41,28 @@ class Welcome(Messageable):
             dir="",
             options=QtWidgets.QFileDialog.ShowDirsOnly
         ))
-        if version_path and version_path != Path("."):
-            self.terminal.add_version(version_path)
+        if version_path and version_path != Path("."): # 传空值就忽略，什么消息也不发
+            # 开始解析版本路径
+            try:
+                self.terminal.add_version(version_path)
+            except MCException.NotMCGameFolder as e:
+                self.message.error(f"{e}")
+                return
+            except Exception as e:
+                self.message.error(f"版本导入失败：{e}")
+                return
+
+            # 版本路径解析完毕了，接下来就是加载前端版本列表
             with open("versions.json", 'r', encoding='utf-8') as f:
                 try:
                     versions = json.load(f)
-                    migrate = Migrate(terminal=self.terminal, version_paths=versions)
-                    self.terminal.window.setCentralWidget(migrate)
-                    self.message.done("版本导入成功！")
-                except:
-                    logging.error("解析versions.json文件失败")
-                    welcome = Welcome(terminal=self.terminal)
-                    self.terminal.window.setCentralWidget(welcome)
-                    self.message.error("版本导入失败！")
+                    if not versions: # 怎么是空值？
+                        raise IOError("version.json内容为空")
+                except (IOError, OSError) as e:
+                    self.message.error(f"读取versions.json失败：{e}")
+                    return
+                except Exception as e:
+                    self.message.error(f"发生了意外的错误：{e}")
+                    return
+
+            self.terminal.switch_window(Terminal.WindowEnum.MIGRATE, ("版本导入成功！", Message.Level.DONE), versions)
