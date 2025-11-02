@@ -35,34 +35,5 @@ class Welcome(Messageable):
         self.resize(800, 400)
 
     def button_import_clicked(self):
-        version_path = Path(QtWidgets.QFileDialog.getExistingDirectory(
-            parent=None,
-            caption="选择.minecraft文件夹",
-            dir="",
-            options=QtWidgets.QFileDialog.ShowDirsOnly
-        ))
-        if version_path and version_path != Path("."): # 传空值就忽略，什么消息也不发
-            # 开始解析版本路径
-            try:
-                self.terminal.add_version(version_path)
-            except MCException.NotMCGameFolder as e:
-                self.message.error(f"{e}")
-                return
-            except Exception as e:
-                self.message.error(f"版本导入失败：{e}")
-                return
-
-            # 版本路径解析完毕了，接下来就是加载前端版本列表
-            with open("versions.json", 'r', encoding='utf-8') as f:
-                try:
-                    versions = json.load(f)
-                    if not versions: # 怎么是空值？
-                        raise IOError("version.json内容为空")
-                except (IOError, OSError) as e:
-                    self.message.error(f"读取versions.json失败：{e}")
-                    return
-                except Exception as e:
-                    self.message.error(f"发生了意外的错误：{e}")
-                    return
-
+        if versions := self.terminal.import_version():
             self.terminal.switch_window(Terminal.WindowEnum.MIGRATE, ("版本导入成功！", Message.Level.DONE), versions)

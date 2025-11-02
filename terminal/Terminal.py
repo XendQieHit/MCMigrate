@@ -2,7 +2,7 @@ from enum import Enum
 from typing import List
 from pathlib import Path
 from PySide6 import QtWidgets, QtCore
-import Message, Dialog
+import Message, Dialog, MCException
 from terminal.func import version, mod, config
 import os, requests, hashlib, yaml, shutil, json, re, zipfile, logging
 
@@ -15,6 +15,44 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
         self.is_migrating = False
         self.pending_num = 0
         self.main_window = main_window
+    
+    def import_version(self) -> list[dict] | None:
+        '''
+        为前端预制封装的导入方法，可根据返回的versions是否为None来判断导入成功
+        '''
+        version_path = Path(QtWidgets.QFileDialog.getExistingDirectory(
+            parent=None,
+            caption="选择.minecraft文件夹",
+            dir="",
+            options=QtWidgets.QFileDialog.ShowDirsOnly
+        ))
+        if version_path == Path("."): return None # 传空值就忽略，什么消息也不发
+        # 开始解析版本路径
+        try:
+            self.add_version(version_path)
+        except MCException.NotMCGameFolder as e:
+            self.send_message(f"{e}", Message.Level.ERROR)
+            return None
+        except MCException.VersionsFolderNotFound as e:
+            self.send_message(f"{e}", Message.Level.WARNING)
+            return None
+        except Exception as e:
+            self.send_message(f"导入版本失败：{e}", Message.Level.ERROR)
+            return None
+
+        # 版本路径解析完毕了，接下来就是加载前端版本列表
+        with open("versions.json", 'r', encoding='utf-8') as f:
+            try:
+                versions = json.load(f)
+                if not versions: # 怎么是空值？
+                    raise IOError("version.json内容为空")
+                return versions
+            except (IOError, OSError) as e:
+                self.send_message(f"读取versions.json失败：{e}", Message.Level.ERROR)
+                return None
+            except Exception as e:
+                self.send_message(f"发生了意外的错误：{e}", Message.Level.ERROR)
+                return None
 
     def switch_window(self, window_enum: 'WindowEnum', msg_bar: tuple[str, Message.Level], *params):
         # 切换窗口界面

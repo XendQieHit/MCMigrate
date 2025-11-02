@@ -9,3 +9,7 @@ class NotMCGameFolder(MCException):
 class VersionParseError(MCException):
     def __init__(self):
         super().__init__("解析版本失败")
+
+class VersionsFolderNotFound(MCException):
+    def __init__(self):
+        super().__init__("未发现versions文件夹，还没下游戏吗...?")

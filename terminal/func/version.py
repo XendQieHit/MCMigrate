@@ -82,7 +82,7 @@ def parse_path(path: Path) -> list[dict]:
                     versions.append(parse_version(p, True))
                     versions.append(parse_version(p, False))
     else: 
-        message.send_message("未发现versions文件夹，还没下游戏吗...?", Message.Level.WARNING)
+        raise MCException.VersionsFolderNotFound()
 
     # 汇总一下哪些版本导入失败
     filtered_versions = []

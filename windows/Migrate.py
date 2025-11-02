@@ -54,15 +54,7 @@ class Migrate(Messageable):
         self.resize(800, 400)
 
     def button_import_clicked(self):
-        path = Path(QtWidgets.QFileDialog.getExistingDirectory(
-            parent=None,
-            caption="选择.minecraft文件夹",
-            dir="",
-            options=QtWidgets.QFileDialog.ShowDirsOnly
-        ))
-        if path == Path("."): return
-        if self.terminal.add_version(path):
-            versions = self.terminal.get_versions()
+        if versions:= self.terminal.import_version():
             self.versions = versions
             self.ver_list_source.update_versions(versions)
             self.ver_list_target.update_versions(versions)

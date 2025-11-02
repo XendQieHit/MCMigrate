@@ -156,3 +156,4 @@ class Messageable(QtCore.QObject):
             self.logger.error(msg)
         
         self.message_requested.emit(msg, msg_level)
+    
