@@ -1,10 +1,11 @@
 from enum import Enum
-from typing import List
+from typing import List, Callable
 from pathlib import Path
 from PySide6 import QtWidgets, QtCore
-import Message, Dialog, MCException
-from terminal.func import version, mod, config
 import os, requests, hashlib, yaml, shutil, json, re, zipfile, logging
+
+from terminal.func import version, mod, config
+import Message, Dialog, MCException
 
 logging.basicConfig(level=logging.INFO)
 
@@ -12,9 +13,9 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
     def __init__(self, main_window: QtWidgets.QMainWindow):
         super().__init__(__name__)
         self.config = config.get_config()
-        self.is_migrating = False
         self.pending_num = 0
         self.main_window = main_window
+        self.thread_migrate = QtCore.QThread()
     
     def import_version(self) -> list[dict] | None:
         '''
@@ -54,18 +55,29 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
                 self.send_message(f"发生了意外的错误：{e}", Message.Level.ERROR)
                 return None
 
-    def switch_window(self, window_enum: 'WindowEnum', msg_bar: tuple[str, Message.Level], *params):
-        # 切换窗口界面
+    def switch_window(self, window_enum: 'WindowEnum', *params):
         self.main_window.setCentralWidget(window_enum.clazz(self, *params))
+
+    def switch_window_with_msg(self, window_enum: 'WindowEnum', msg_bar: tuple[str, Message.Level], *params):
+        # 切换窗口界面
+        self.switch_window(window_enum, *params)
 
         # 发送预留消息
         if msg_bar and hasattr(self.main_window.centralWidget(), 'message'):
             self.send_message(*msg_bar)
+    
+    def switch_window_with_dialog(self, window_enum: 'WindowEnum', dialog: tuple[str, Dialog.Level, str, None, tuple[str, Dialog.Level, Callable[[], None]]], *params):
+        # 切换窗口界面
+        self.switch_window(window_enum, *params)
+        
+        # 发送预留消息
+        if dialog and hasattr(self.main_window.centralWidget(), 'dialog'):
+            self.send_message(*dialog)
 
-    def migrate(self, source_json: dict, target_json: dict):
+    def migrate(self, source_json: dict, target_json: dict, use_pending_num_func: Callable[[int], None]):
+        if self.thread_migrate.isRunning(): return
         source_dir = Path(source_json['game_path'])
         target_dir = Path(target_json['game_path'])
-
         # 路径检查
         if source_dir == None or target_dir == None:
             logging.info("请先选择迁移版本和目标版本")
@@ -74,75 +86,21 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
         elif source_dir == target_dir:
             self.message_requested.emit('不能迁移自己口牙>_<', Message.Level.WARNING)
             return
+
         # 条件符合，开始迁移！
+        # 创建新线程
+        def finish():
+            self.thread_migrate.quit()
+            self.task.deleteLater()
+            self.message_requested.emit(f"{source_json.get('name')}已迁移至{target_json.get('name')}！", Message.Level.DONE)
+        self.task = Terminal.TaskMigrate(self, source_dir, target_dir, source_json, target_json)
+        self.task.finished.connect(finish)
+        self.task.pending_complete.connect(use_pending_num_func)
+        self.task.moveToThread(self.thread_migrate)
+        self.thread_migrate.started.connect(self.task.do_work)
+        self.thread_migrate.start()
 
-        # 计算待处理任务数量（复制文件）
-        self.pending_num += len([dir for dir in os.listdir(source_dir) if dir not in list(config.get_config_value('migrate', 'excludes'))])
-
-        not_mod_loader = ['optifine', 'release', 'snapshot', 'unknown']
-        if (source_json['mod_loader'] not in not_mod_loader) and (target_json['mod_loader'] not in not_mod_loader):
-            mod_list: List[str] = os.listdir(source_dir / "mods")
-
-            # 计算待处理任务数量（mod下载）
-            self.pending_num += len(mod_list)
             
-            # 开始下载mod
-            logging.info("下载mod中")
-            self.download_mods(source_dir / "mods", target_dir / "mods", target_json["version"], target_json["mod_loader"], mod_list)
-            logging.info("mod下载完成")
-
-        logging.info("迁移游戏文件")
-        self.migrate_file(source_dir, target_dir)
-        logging.info("游戏文件迁移完成")
-        self.message_requested.emit(f"{source_json.get('name')}已迁移至{target_json.get('name')}！", Message.Level.Info)
-
-    def migrate_file(self, source_dir: Path, target_dir: Path):
-        for item in Path(source_dir).iterdir():
-            if item.name.startswith('.') or item.name.startswith('$'): continue
-            if self.config['migrate']['filter_rule'] == 'excludes' and item.name not in self.config['migrate']['excludes']:
-                logging.info(f"复制{item}至{target_dir / item.name}")
-                try:
-                    shutil.copy(item, target_dir / item.name)
-                except PermissionError:
-                    logging.warning("权限不足")
-                except Exception as e:
-                    logging.error("未知错误：" + e)
-            self.pending_num -= 1
-            
-    def download_mods(self, source_dir: str, target_dir: str, target_ver: str, mod_loader: str, file_name_list: List[str]):
-        # 缓存，记录没有下载完成的mod
-        if not os.path.exists(f"{target_dir}dl.txt"):
-            with open(f"{target_dir}dl.txt", 'w') as f:
-                logging.info("已创建缓存文件dl.txt")
-        with open(f"{target_dir}dl.txt", 'r') as f:
-            logging.info("读取缓存文件dl.txt")
-            file_name_list_done: List[str] = [line.strip() for line in f.readlines()]
-        not_adapt_mods: List[str] = []
-
-        for old_file_name in file_name_list:
-            logging.info(f"\n{old_file_name}")
-            
-            # 检测是否已下载，有则跳过
-            if old_file_name in file_name_list_done:
-                logging.info(f"{old_file_name} 已下载")
-                self.pending_num -= 1
-                continue
-
-            if not mod.modrinth(target_ver, mod_loader, source_dir, old_file_name, target_dir, not_adapt_mods):
-                if not mod.curseforge(target_ver, mod_loader, source_dir, old_file_name, target_dir, not_adapt_mods):
-                    list.append(not_adapt_mods, old_file_name)
-                    self.pending_num -= 1
-                    continue
-                self.pending_num -= 1
-
-        # 结果统计
-        if len(not_adapt_mods) != 0:
-            logging.info("\n\n\n以下模组暂未找到适配：")
-            for not_adapt_mod in not_adapt_mods: logging.info(not_adapt_mod)
-        else: 
-            logging.info("\n\n\n无不适配情况，全部模组已完成版本迁移！")
-            os.remove(f"{target_dir}dl.txt")
-    
     def add_version(self, path: Path) -> list[dict] | None:
         return version.add_version(path)
         
@@ -180,3 +138,132 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
             module_path, class_name = self.value.rsplit('.', 1)
             module = importlib.import_module(module_path)
             return getattr(module, class_name)
+        
+    class TaskMigrate(QtCore.QObject):
+        finished = QtCore.Signal()
+        pending_complete = QtCore.Signal(int)
+        def __init__(self, terminal: 'Terminal', source_dir: Path, target_dir: Path, source_json: dict, target_json: dict):
+            super().__init__()
+            self.terminal = terminal
+            self.source_dir = source_dir
+            self.target_dir = target_dir
+            self.source_json = source_json
+            self.target_json = target_json
+
+            # 任务总数
+            self.pending_num = 0
+
+            # 错误实例
+            self.failed_files_copy = []
+            self.failed_mods_dl = []
+            self.failed_mods_not_adapt = []
+            
+        @QtCore.Slot()
+        def do_work(self):
+            # 计算待处理任务数量（复制文件）
+            self.pending_num += len([dir for dir in os.listdir(self.source_dir) if dir not in list(config.get_config_value('migrate', 'excludes'))])
+
+            not_mod_loader = ['optifine', 'release', 'snapshot', 'unknown']
+            if (self.source_json['mod_loader'] not in not_mod_loader) and (self.target_json['mod_loader'] not in not_mod_loader):
+                
+                mod_list: List[str] = os.listdir(self.source_dir / "mods")
+                # 计算待处理任务数量（mod下载）
+                self.pending_num += len(mod_list)
+                
+                # 开始下载mod
+                logging.info("下载mod中")
+                self.download_mods(self.source_dir / "mods", self.target_dir / "mods", self.target_json["version"], self.target_json["mod_loader"], mod_list)
+                logging.info("mod下载完成")
+
+            # 开始迁移文件
+            logging.info("迁移游戏文件")
+            self.migrate_file(self.source_dir, self.target_dir)
+            logging.info("游戏文件迁移完成")
+            self.report_exception()
+            self.finished.emit()
+
+        def migrate_file(self, source_dir: Path, target_dir: Path):
+            for item in Path(source_dir).iterdir():
+                if item.name.startswith('.') or item.name.startswith('$'): continue # 跳过隐藏文件
+                if self.terminal.config['migrate']['filter_rule'] == 'excludes' and item.name not in self.terminal.config['migrate']['excludes']: # 根据config.yml中的过滤规则来筛去文件
+                    logging.info(f"复制{item}至{target_dir / item.name}")
+                    try:
+                        if item.is_dir(): # 文件夹（覆盖）
+                            shutil.copytree(item, target_dir / item.name, dirs_exist_ok=True)
+                        else: # 文件
+                            shutil.copy(item, target_dir / item.name)
+                    except PermissionError as e:
+                        print(item, 1)
+                        logging.warning("权限不足")
+                        self.failed_files_copy.append([item.name, "权限不足"])
+                    except Exception as e:
+                        print(item, 0)
+                        logging.error("未知错误：" + str(e))
+                        self.failed_files_copy.append([item.name, e])
+                self.reduce_pending_num()
+                
+        def download_mods(self, source_dir: str, target_dir: str, target_ver: str, mod_loader: str, file_name_list: List[str]):
+            # 缓存，记录没有下载完成的mod
+            if not os.path.exists(f"{target_dir}dl.txt"):
+                with open(f"{target_dir}dl.txt", 'w') as f:
+                    logging.info("已创建缓存文件dl.txt")
+            with open(f"{target_dir}dl.txt", 'r') as f:
+                logging.info("读取缓存文件dl.txt")
+                file_name_list_done: List[str] = [line.strip() for line in f.readlines()]
+            self.failed_mods_not_adapt: List[str] = []
+
+            for old_file_name in file_name_list:
+                logging.info(f"\n{old_file_name}")
+                
+                # 检测是否已下载，有则跳过
+                if old_file_name in file_name_list_done:
+                    logging.info(f"{old_file_name} 已下载")
+                    self.pending_num -= 1
+                    continue
+
+                if not mod.modrinth(target_ver, mod_loader, source_dir, old_file_name, target_dir, self.failed_mods_not_adapt):
+                    if not mod.curseforge(target_ver, mod_loader, source_dir, old_file_name, target_dir, self.failed_mods_not_adapt):
+                        list.append(self.failed_mods_not_adapt, old_file_name)
+
+                self.reduce_pending_num()
+
+            # 结果统计
+            if len(self.failed_mods_not_adapt) != 0:
+                logging.info("\n以下模组暂未找到适配：")
+                for not_adapt_mod in self.failed_mods_not_adapt: logging.info(not_adapt_mod)
+            else: 
+                logging.info("\n无不适配情况，全部模组已完成版本迁移！")
+                os.remove(f"{target_dir}dl.txt")
+        
+        def report_exception(self):
+            if self.failed_files_copy != [] or self.failed_mods_dl != [] or self.failed_mods_not_adapt != []:
+                report_content = ""
+                level = Dialog.Level.WARNING
+
+                # 模组未适配
+                if self.failed_mods_not_adapt != []:
+                    report_content += f"以下模组在 {self.target_json.get('version')} 版本中没有适配：\n"
+                    for file in self.failed_mods_not_adapt:
+                        report_content += file + '\n'
+
+                # 模组下载失败
+                if self.failed_mods_dl != []:
+                    report_content += f"以下模组下载失败：\n"
+                    for file in self.failed_mods_dl:
+                        report_content += file + '\n'
+
+                # 文件迁移失败（这个部分问题就比较多了，就由说明具体错误
+                if self.failed_files_copy != []:
+                    level = Dialog.Level.ERROR
+                    report_content += f"以下文件在迁移时出错：\n"
+                    for file in self.failed_files_copy:
+                        report_content += f"{file[0]}：{file[1]}\n"
+                self.terminal.send_dialog(
+                    "遇到问题了...",
+                    level,
+                    report_content
+                )
+
+        def reduce_pending_num(self):
+            self.pending_num -= 1
+            self.pending_complete.emit(self.pending_num)

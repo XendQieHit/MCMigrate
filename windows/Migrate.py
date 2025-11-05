@@ -59,11 +59,11 @@ class Migrate(Messageable):
             self.ver_list_source.update_versions(versions)
             self.ver_list_target.update_versions(versions)
             self.window().update()
+            self.message.done("版本导入成功！")
 
     def button_migrate_clicked(self):
         # 条件检测
-        if self.terminal.is_migrating:
-            logging.info()
+        if self.terminal.thread_migrate.isRunning():
             self.message.info("请先等待迁移完成")
             return
         ver_source: Migrate.VersionItem = self.ver_list_source.itemWidget(self.ver_list_source.currentItem())
@@ -72,10 +72,17 @@ class Migrate(Messageable):
             logging.info("请先选择迁移版本和目标版本")
             self.message.info("请先选择迁移版本和目标版本")
             return
-        self.terminal.migrate(source_json=ver_source.json, target_json=ver_target.json)
-        
+
         # 添加任务详情悬浮按钮
-        self.button_migrate_detail = ButtonMigrateDetail(self)
+        self.button_migrate_detail = ButtonMigrateDetail(self.terminal, self)
+        self.button_migrate_detail.show_with_animation()
+        self.terminal.thread_migrate.finished.connect(self.button_migrate_detail.close_with_animation)
+        self.message.info(f"正在迁移 {ver_source.json.get('name')} 至 {ver_target.json.get('name')}")
+        
+        # 开始线程任务
+        self.terminal.migrate(source_json=ver_source.json, target_json=ver_target.json, use_pending_num_func=self.button_migrate_detail.change_percent)
+
+        
     
     def percent_update(self, timer: QtCore.QTimer, ring: Geometry.LoadingRingText):
         ring.change_percent(self.terminal.pending_num)
@@ -278,7 +285,7 @@ class Migrate(Messageable):
 
                         # 如果全删完了，就切换为欢迎界面
                         if self.main_window.versions == []:
-                            self.main_window.terminal.switch_window(Terminal.WindowEnum.WELCOME, ("已成功移除 ！", Message.Level.DONE))
+                            self.main_window.terminal.switch_window(Terminal.WindowEnum.WELCOME)
                             dialog.close_with_animation()
                             
                         # 更新界面列表（同时更新源和目标列表）
@@ -361,26 +368,96 @@ class Migrate(Messageable):
             logging.info("已更新版本列表")
             
 class ButtonMigrateDetail(QtWidgets.QPushButton):
-    def __init__(self, terminal: Terminal, parent_widget=None):
-        super().__init__(self, parent_widget)
+    def __init__(self, terminal: Terminal, parent_widget):
+        super().__init__(parent=parent_widget)
+        self.terminal = terminal
+        self._size = 70
+        self.total_pending_num: int = None
         self.setObjectName('button_migrate_detail')
-        self.setFixedSize(70, 70)
-        self.setParent(self)
+        self.setFixedSize(self._size, self._size)
         layout_detail = QtWidgets.QVBoxLayout()
         self.setLayout(layout_detail)
         self.setStyleSheet(load_stylesheet("qss/migrate.qss"))
-        self.clicked.connect(self.button_migrate_detail_clicked)
+        self.clicked.connect(lambda: self.terminal.switch_window(Terminal.WindowEnum.MIGRATE_DETAIL, self.terminal))
 
-        self.ring = Geometry.LoadingRingText(QtGui.QColor("#EDFFFE"), QtGui.QColor("#EDFFFE"), parent=self)
+        self.ring = Geometry.LoadingRingText(QtGui.QColor("#EDEDFF"), QtGui.QColor("#EDEDFF"))
+        self.ring.setStyleSheet("background: transparent")
         layout_detail.addWidget(self.ring, 1, QtCore.Qt.AlignCenter)
         
-        self.percent_update_timer = QtCore.QTimer()
-        self.percent_update_timer.timeout.connect(lambda: self.percent_update(timer=self.percent_update_timer, ring=self.ring))
-        self.percent_update_timer.start(12)
+        self.raise_()
 
-        self.move(self.width() - 100, self.height() - 135)
+        # 放大动画的阴影，先预设以下（我不要再新整个类了aaa
+        self.shadow = QtWidgets.QWidget(parent=parent_widget)
+        self.shadow.setFixedSize(self._size, self._size)
+        self.shadow.setStyleSheet("background-color: '#5f9772'; border-radius: 35px")
+        self.move(self.parentWidget().width() - self._size - 20, self.parentWidget().height() - self._size - 20)
+    
+    @QtCore.Slot(int)
+    def change_percent(self, num: int):
+        print(num)
+        if self.total_pending_num == None:
+            self.total_pending_num = num
+            return
+        self.ring.change_percent(1 - num / self.total_pending_num)
+    
+    def show_with_animation(self):
         self.show()
         self.raise_()
 
-    def button_migrate_detail_clicked(self):
-        pass
+        # === 按钮弹入动画 ===
+        pop_out = QtCore.QPropertyAnimation(self, b"pos")
+        end_x = self.parentWidget().width() - self._size - 20
+        end_y = self.parentWidget().height() - self._size - 50
+        start_y = self.parentWidget().height() + 20  # 从下方开始
+
+        pop_out.setStartValue(QtCore.QPoint(end_x, start_y))
+        pop_out.setEndValue(QtCore.QPoint(end_x, end_y))
+        pop_out.setEasingCurve(QtCore.QEasingCurve.OutBack)
+        pop_out.setDuration(300)
+
+        # === 阴影扩散（使用 geometry，谨慎）===
+        # 确保 shadow 已正确创建
+        shadow_rect = self.shadow.geometry()
+        expanded_rect = shadow_rect.adjusted(-100, -100, 100, 100)  # 扩大100px
+
+        shadow_scale = QtCore.QPropertyAnimation(self.shadow, b"geometry")
+        shadow_scale.setStartValue(shadow_rect)
+        shadow_scale.setEndValue(expanded_rect)
+        shadow_scale.setEasingCurve(QtCore.QEasingCurve.InBounce)
+        shadow_scale.setDuration(300)
+
+        # === 阴影淡出（使用 opacity effect）===
+        if not hasattr(self, 'shadow_effect'):
+            self.shadow_effect = QtWidgets.QGraphicsOpacityEffect(self.shadow)
+            self.shadow.setGraphicsEffect(self.shadow_effect)
+
+        shadow_fade = QtCore.QPropertyAnimation(self.shadow_effect, b"opacity")
+        shadow_fade.setStartValue(1.0)
+        shadow_fade.setEndValue(1.0)
+        shadow_fade.setDuration(240)
+        shadow_fade.setEasingCurve(QtCore.QEasingCurve.InBounce)
+
+        # === 启动动画组 ===
+        self.anim_group = QtCore.QParallelAnimationGroup()
+        self.anim_group.addAnimation(pop_out)
+        self.anim_group.addAnimation(shadow_scale)
+        self.anim_group.addAnimation(shadow_fade)
+        self.anim_group.start(QtCore.QAbstractAnimation.DeleteWhenStopped)
+
+    def close_with_animation(self):
+        # === 按钮弹入动画 ===
+        self.anim = QtCore.QPropertyAnimation(self, b"pos")
+        end_x = self.parentWidget().width() - self._size - 20
+        end_y = self.parentWidget().height() + 20
+        start_y = self.parentWidget().height() - self._size - 50
+
+        self.anim.setStartValue(QtCore.QPoint(end_x, start_y))
+        self.anim.setEndValue(QtCore.QPoint(end_x, end_y))
+        self.anim.setEasingCurve(QtCore.QEasingCurve.OutBack)
+        self.anim.setDuration(300)
+        
+        def close_and_delete():
+            self.close()
+            self.deleteLater()
+        self.anim.finished.connect(close_and_delete)
+        self.anim.start()

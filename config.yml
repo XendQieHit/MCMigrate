@@ -1,6 +1,7 @@
 migrate:
-  config: true
-  data: true
+  file:
+    # 在迁移文件的时候，对以存在的文件进行的操作（replace替换，keep保留, query询问）
+    copy-option: keep
   excludes:
   - assets
   - data

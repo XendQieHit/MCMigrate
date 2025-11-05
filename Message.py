@@ -42,7 +42,6 @@ class MessageBar(QtWidgets.QWidget):
     def show_with_animation(self):
         """显示并播放进入动画"""
         # 如果有父窗口，定位到父窗口右上角
-        print(1, self)
         if self.main_window:
             # 定位到主窗口右上角（内部坐标）
             x = self.main_window.width() - self.width() - 20
@@ -75,7 +74,6 @@ class MessageBar(QtWidgets.QWidget):
         QtCore.QTimer.singleShot(3000, self.hide_with_animation)
         
     def hide_with_animation(self):
-        print(2)
         """播放退出动画并隐藏"""
         if self.animations and self.animations.state() == QtCore.QAbstractAnimation.Running:
             return

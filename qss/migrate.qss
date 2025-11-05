@@ -107,6 +107,9 @@ QPushButton#button_migrate_detail {
     padding: 4px
 }
 QPushButton#button_migrate_detail:hover {
+    background-color: '#86dea4'
+}
+QPushButton#button_migrate_detail:pressed {
     background-color: '#68c488'
 }
 

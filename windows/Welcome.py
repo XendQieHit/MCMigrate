@@ -36,4 +36,4 @@ class Welcome(Messageable):
 
     def button_import_clicked(self):
         if versions := self.terminal.import_version():
-            self.terminal.switch_window(Terminal.WindowEnum.MIGRATE, ("版本导入成功！", Message.Level.DONE), versions)
+            self.terminal.switch_window_with_msg(Terminal.WindowEnum.MIGRATE, ("版本导入成功！", Message.Level.DONE), versions)

@@ -17,9 +17,9 @@ CONFIG_PATH = Path('../config.yml')
 
 default_config = {
         'migrate':{
-            'data': True,
-            'screenshots': True,
-            'config': True,
+            'file': {
+                'copy_option': 'keep'
+            },
             'filter_rule': 'excludes',
             'excludes': [
                 'assets',
