@@ -6,12 +6,25 @@ import logging
 
 from windows.Migrate import Migrate
 from windows.Welcome import Welcome
+from message import Message, Dialog
+from message.DisplayMessageable import DisplayMessageable
 
 logging.basicConfig(level=logging.INFO)
 
+class MainWindow(DisplayMessageable, QtWidgets.QMainWindow):
+    change_central_widget = QtCore.Signal()
+    def __init__(self):
+        super().__init__()
+
+    # 防止窗口在切换的时候悬浮组件被遮盖
+    def setCentralWidget(self, widget: QtWidgets.QWidget):
+        super().setCentralWidget(widget)
+        if self.message.current_message: self.message.current_message.raise_()
+        if self.dialog.current_dialog: self.dialog.current_dialog.raise_()
+        
 # 初始化主窗口
 app = QtWidgets.QApplication([])
-window = QtWidgets.QMainWindow()
+window = MainWindow()
 window.setWindowTitle("MCMigrator")
 window.setWindowIcon(QtGui.QIcon("assets/icon_64x64.png"))
 window.resize(800, 400)

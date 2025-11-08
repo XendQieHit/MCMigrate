@@ -6,8 +6,8 @@ from PIL import ImageColor
 from windows.loadStyleSheet import load_stylesheet
 
 class Level(Enum):
-    INFO = (1, "#7bccff", "#34566c5f", "#7bccff2b", "#ffffff")
-    DONE = (2, "#80eb83", "#3068325f", "#80eb832d",  "#38413e")
+    INFO = (1, "#5cb7ef", "#34566c5f", "#7bccff2b", "#ffffff")
+    DONE = (2, "#5adc5e", "#3068325f", "#80eb832d",  "#38413e")
     WARNING = (3, "#f6e16a", "#8a7d335f", "#f6e16a2d", "#000000")
     ERROR = (4, "#e7612c", "#981b0d5f", "#e7612c2d", "#ffffff")
     
@@ -76,6 +76,7 @@ class DialogWindow(QtWidgets.QWidget):
         self.dialog_window.layout().addWidget(self.content_text_view)
 
         # 按钮区
+        self.dialog_buttons: list[DialogWindow.DialogButton] = []
         self.button_section = QtWidgets.QWidget(self.dialog_window)
         self.button_section.setLayout(QtWidgets.QHBoxLayout())
         self.button_section.layout().setAlignment(QtCore.Qt.AlignmentFlag.AlignRight)
@@ -86,7 +87,9 @@ class DialogWindow(QtWidgets.QWidget):
         if buttons:
             for button in buttons:
                 if button:
-                    self.button_section.layout().addWidget(DialogWindow.DialogButton(button[0], button[1], button[2]))
+                    btn = DialogWindow.DialogButton(button[0], button[1], button[2])
+                    self.button_section.layout().addWidget(btn)
+                    self.dialog_buttons.append(btn)
         
         # 取消按钮
         self.button_cancel = DialogWindow.DialogButton('取消', Level.INFO, self.close_with_animation)
@@ -94,12 +97,18 @@ class DialogWindow(QtWidgets.QWidget):
         if text:= kwargs.get('change_cancel_btn_text', False):
             self.button_cancel.setText(text)
 
+        # 根据kwargs进行其他额外参数调整
+        if kwargs.get('close_when_clicked_any_btn', False):
+            for btn in self.dialog_buttons:
+                btn.clicked.connect(self.close_with_animation)
+
         # 准备动画展示，先隐藏界面
         self.effect_opacity = QtWidgets.QGraphicsOpacityEffect(opacity=0.0)
         self.setGraphicsEffect(self.effect_opacity)
 
     def show_with_animation(self):
         self.show()
+        self.raise_()
 
         # 先将其移到中心，并设为 0 大小
         center = self.rect().center()
@@ -155,6 +164,14 @@ class Dialog:
         self.current_dialog: DialogWindow = None
 
     def show_dialog(self, title: str, level: Level, content_text: str, *buttons, **kwargs):
+        '''
+        弹出问答框
+
+        Args:
+            button(tuple[str, Dialog.Level, Callable[[], None]]): 按钮 
+            change_cancel_btn_text(str): 改变关闭问答框按钮的文字
+            close_when_clicked_any_btn(bool): 点击任意按钮就关闭问答框
+        '''
         if self.current_dialog:
             self.current_dialog.close()
             self.current_dialog.deleteLater()
@@ -163,17 +180,49 @@ class Dialog:
         self.current_dialog.show_with_animation()
         return self.current_dialog
 
-    def info(self, title: str, content_text: str, *buttons):
-        return self.show_dialog(title, Level.INFO, content_text, *buttons)
+    def info(self, title: str, content_text: str, *buttons, **kwargs):
+        '''
+        弹出问答框
 
-    def warning(self, title: str, content_text: str, *buttons):
-        return self.show_dialog(title, Level.WARNING, content_text, *buttons)
+        Args:
+            button(tuple[str, Dialog.Level, Callable[[], None]]): 按钮 
+            change_cancel_btn_text(str): 改变关闭问答框按钮的文字
+            close_when_clicked_any_btn(bool): 点击任意按钮就关闭问答框
+        '''
+        return self.show_dialog(title, Level.INFO, content_text, *buttons, **kwargs)
 
-    def error(self, title: str, content_text: str, *buttons):
-        return self.show_dialog(title, Level.ERROR, content_text, *buttons)
+    def warning(self, title: str, content_text: str, *buttons, **kwargs):
+        '''
+        弹出问答框
 
-    def done(self, title: str, content_text: str, *buttons):
-        return self.show_dialog(title, Level.DONE, content_text, *buttons)
+        Args:
+            button(tuple[str, Dialog.Level, Callable[[], None]]): 按钮 
+            change_cancel_btn_text(str): 改变关闭问答框按钮的文字
+            close_when_clicked_any_btn(bool): 点击任意按钮就关闭问答框
+        '''
+        return self.show_dialog(title, Level.WARNING, content_text, *buttons, **kwargs)
+
+    def error(self, title: str, content_text: str, *buttons, **kwargs):
+        '''
+        弹出问答框
+
+        Args:
+            button(tuple[str, Dialog.Level, Callable[[], None]]): 按钮 
+            change_cancel_btn_text(str): 改变关闭问答框按钮的文字
+            close_when_clicked_any_btn(bool): 点击任意按钮就关闭问答框
+        '''
+        return self.show_dialog(title, Level.ERROR, content_text, *buttons, **kwargs)
+
+    def done(self, title: str, content_text: str, *buttons, **kwargs):
+        '''
+        弹出问答框
+
+        Args:
+            button(tuple[str, Dialog.Level, Callable[[], None]]): 按钮 
+            change_cancel_btn_text(str): 改变关闭问答框按钮的文字
+            close_when_clicked_any_btn(bool): 点击任意按钮就关闭问答框
+        '''
+        return self.show_dialog(title, Level.DONE, content_text, *buttons, **kwargs)
     
 class Dialogable(QtCore.QObject):
     # 只定义 4 个参数：title, level, content, options（包含 buttons + kwargs）

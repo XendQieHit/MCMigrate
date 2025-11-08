@@ -49,6 +49,7 @@ class MessageBar(QtWidgets.QWidget):
             self.move(x, y)
         
         self.show()
+        self.raise_()
         
         # 淡入动画
         fade_in = QtCore.QPropertyAnimation(self, b"windowOpacity")

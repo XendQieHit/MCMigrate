@@ -1,5 +1,6 @@
 from typing import List
-import requests, hashlib, logging, Message
+import requests, hashlib, logging
+from message import Message
 
 # 设置日志
 logger = logging.getLogger(__name__)
@@ -27,7 +28,7 @@ def modrinth(target_version: str, mod_loader: str, source_dir: str, old_file_nam
 
     old_version_file_hash = get_file_hash(f"{source_dir / old_file_name}")
     try:
-        respone = requests.post(f"https://api.modrinth.com/v2/version_file/{old_version_file_hash}/update", headers=headers, params={"algorithm": "sha1"}, json=request_body)
+        respone = requests.post(f"https://api.modrinth.com/v2/version_file/{old_version_file_hash}/update", headers=headers, params={"algorithm": "sha1"}, json=request_body, timeout=120)
 
         if not respone.ok:
             logger.warning("[modrinth]链接炸了或无适配版本")

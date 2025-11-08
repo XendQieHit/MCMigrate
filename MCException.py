@@ -1,4 +1,4 @@
-import Message
+from message import Message
 
 class MCException(Exception):
     def __init__(self, *args):

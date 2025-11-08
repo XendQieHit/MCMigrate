@@ -294,7 +294,6 @@ if __name__ == "__main__":
     )
     layout.addWidget(loading_line, 0, QtCore.Qt.AlignCenter)
     window.setStyleSheet('border: 1px solid red')
-    print(loading_ring.width(), loading_line._scene.width())
 
     # 动画
     timer = QtCore.QTimer()

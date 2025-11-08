@@ -5,13 +5,14 @@ from terminal.Terminal import Terminal
 from pathlib import Path
 
 from windows.loadStyleSheet import load_stylesheet
-from windows.Messageable import Messageable
-import Message, MCException
+from windows.SendMessageable import SendMessageable
+from message import Message
+import MCException
 
 # 欢迎界面
-class Welcome(Messageable):
+class Welcome(SendMessageable):
     def __init__(self, terminal: Terminal):
-        super().__init__()
+        super().__init__(terminal.main_window)
         self.terminal = terminal
         self.setStyleSheet("background-color: lightblue;")
         self.layout = QtWidgets.QVBoxLayout(self)

@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Any
-import yaml, os, logging, Message
+import yaml, os, logging
+from message import Message
 
 # 设置日志
 logger = logging.getLogger(__name__)
@@ -130,7 +131,7 @@ def get_config_value(*keys: str) -> Any | None:
         return current
 
     except (OSError, yaml.YAMLError) as e:
-        print(f"读取配置文件失败：{e}，正在重新生成初始配置文件")
+        logger.error(f"读取配置文件失败：{e}，正在重新生成初始配置文件")
         fixed_config = check_and_fix()
         # 递归调用自己（此时文件已修复）
         return get_config_value(*keys)

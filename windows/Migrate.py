@@ -3,24 +3,47 @@ from PySide6 import QtWidgets, QtGui, QtCore
 from terminal.Terminal import Terminal
 from pathlib import Path
 
-from windows.Messageable import Messageable
-import Message, Dialog, MCException
+from windows.SendMessageable import SendMessageable
+from message import Message, Dialog
 from windows.loadStyleSheet import load_stylesheet
-import windows
-import Geometry
+import Geometry, MCException
 
-class Migrate(Messageable):
+class Migrate(SendMessageable):
     def __init__(self, terminal: Terminal, version_paths: list[dict], migrate_task: Terminal.TaskMigrate=None):
-        super().__init__()
+        super().__init__(terminal.main_window)
         self.versions = version_paths
         self.terminal = terminal
         self.migrate_task = migrate_task
         self.setWindowTitle("MCMigrator")
         self.setWindowIcon(QtGui.QIcon("assets/icon_64x64.png"))
         self.layout = QtWidgets.QVBoxLayout()
+
+        # 顶部栏
+        self.top_bar = QtWidgets.QWidget()
+        self.top_bar.setLayout(QtWidgets.QHBoxLayout())
+        # 标题
         self.window_title = QtWidgets.QLabel("选择要迁移的版本", self)
         self.window_title.setStyleSheet("font-size: 18px; color: #666666")
-        self.layout.addWidget(self.window_title, 0)
+        self.top_bar.layout().addWidget(self.window_title, 1)
+        self.top_bar.setFixedHeight(self.window_title.height())
+        self.top_bar.layout().addStretch()
+        self.top_bar.layout().setContentsMargins(0,0,0,0)
+        # github链接
+        self.github_url = QtWidgets.QPushButton()
+        self.github_url.setIcon(QtGui.QIcon('assets/icon/github.svg'))
+        self.github_url.clicked.connect(lambda: self.dialog.info(
+            "即将跳转至Github",
+            "即将前往MCMigrate的Github仓库。\n如果在使用MCMigrate过程中遇到了Bug，或是其他想要的功能，可以在MCMigrate的Github仓库上的提出Issue来！",
+            (
+                "出发！",
+                Dialog.Level.DONE,
+                lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl('https://github.com/XendQieHit/MCMigrate'))
+            ),
+            close_when_clicked_any_btn=True
+        ))
+        self.github_url.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
+        self.top_bar.layout().addWidget(self.github_url, 0)
+        self.layout.addWidget(self.top_bar, 0)
         
         # 版本列表
         self.list_box = QtWidgets.QHBoxLayout()
@@ -57,9 +80,11 @@ class Migrate(Messageable):
         if self.migrate_task:
             self.button_migrate_detail = ButtonMigrateDetail(self.terminal, self)
             self.button_migrate_detail.set_migrate_task(self.migrate_task)
-            self.migrate_task.update_migrate_general.connect(self.button_migrate_detail.change_percent)
+            self.migrate_task.update_migrate_general.connect(self.button_migrate_detail.update_percent)
             self.button_migrate_detail.show_directly()
             self.terminal.thread_migrate.finished.connect(self.button_migrate_detail.close_with_animation)
+            if not self.migrate_task.is_calculating:
+                self.button_migrate_detail.update_percent()
 
     def button_import_clicked(self):
         if versions:= self.terminal.import_version():
@@ -94,16 +119,9 @@ class Migrate(Messageable):
             self.button_migrate_detail.close()
             return
         self.button_migrate_detail.set_migrate_task(self.terminal.task_migrate)
-        self.terminal.task_migrate.update_migrate_general.connect(self.button_migrate_detail.change_percent)
+        self.terminal.task_migrate.update_migrate_general.connect(self.button_migrate_detail.update_percent)
         self.button_migrate_detail.show_with_animation()
         
-    
-    def percent_update(self, timer: QtCore.QTimer, ring: Geometry.LoadingRingText):
-        ring.change_percent(self.terminal.pending_num)
-        if self.terminal.pending_num == 0 and not self.terminal.is_migrating:
-            timer.stop()
-            timer.deleteLater()
-
     def resizeEvent(self, event):
         super().resizeEvent(event)
         if hasattr(self, 'button_migrate_detail'):
@@ -359,7 +377,6 @@ class Migrate(Messageable):
             self.h_scroll_value = 0
             self.scroll_max = self.horizontalScrollBar().maximum()
             self.scroll_pagestep = self.horizontalScrollBar().pageStep()
-            print(self.scroll_max, self.scroll_pagestep, self.horizontalScrollBar().value())
             
             self.horizontalScrollBar().valueChanged.connect(self.on_scroll)
         
@@ -411,13 +428,9 @@ class ButtonMigrateDetail(QtWidgets.QPushButton):
         # 点击后转至MigrateDetail界面
         self.clicked.connect(lambda: self.terminal.switch_window(Terminal.WindowEnum.MIGRATE_DETAIL, migrate_task, self.parent()))
     
-    @QtCore.Slot(int)
-    def change_percent(self, num: int):
-        print(num)
-        if self.total_pending_num == None:
-            self.total_pending_num = num
-            return
-        self.ring.change_percent(1 - num / self.total_pending_num)
+    @QtCore.Slot()
+    def update_percent(self):
+        self.ring.change_percent(1 - self.terminal.task_migrate.pending_num / self.terminal.task_migrate.pending_num_total)
     
     def show_with_animation(self):
         self.show()

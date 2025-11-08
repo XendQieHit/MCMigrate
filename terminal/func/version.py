@@ -1,7 +1,9 @@
 from pathlib import Path
 from typing import List
 import json, re, zipfile
-import logging, Message, Dialog, MCException
+import logging, MCException
+
+from message import Message, Dialog
 
 # 设置日志
 logging.basicConfig(level=logging.INFO)

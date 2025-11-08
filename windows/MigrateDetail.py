@@ -3,13 +3,12 @@ from PySide6 import QtWidgets, QtGui, QtCore
 from terminal.Terminal import Terminal
 
 from windows.loadStyleSheet import load_stylesheet
-from windows.Messageable import Messageable
-from terminal.func import version
+from windows.SendMessageable import SendMessageable
 import Geometry, GeometryIcon
 
-class MigrateDetail(Messageable):
+class MigrateDetail(SendMessageable):
     def __init__(self, terminal: Terminal, migrate_task: Terminal.TaskMigrate, pre_window: QtWidgets.QFrame):
-        super().__init__()
+        super().__init__(terminal.main_window)
         self.pre_window = pre_window
         self.terminal = terminal
         self.migrate_task = migrate_task
@@ -44,23 +43,38 @@ class MigrateDetail(Messageable):
         self.button_back.move(15, 15)
         self.raise_()
 
-        # 解析现在进程有哪些任务，然后添加显示
-        task: list[str] = []
         # 模组方面
         self.task_list.add_task('mod', '下载更新模组', MigrateDetail.TaskStatus.IN_PROGRESS)
         # 文件方面
         self.task_list.add_task('file', '迁移游戏文件', MigrateDetail.TaskStatus.PENDING)
         self.task_list.layout().addStretch()
+        # （未来如果支持多线程迁移任务的话，就要把上面那个手动添加任务的，改为解析现在进程有哪些任务，然后添加显示）
 
-        # 数据进度同步更新
+        # 初始化进度数据
+        self.init_stats()
+
+        # 进度数据同步更新
         self.migrate_task.update_migrate_general.connect(self.update_loading_ring)
         self.migrate_task.update_migrate_detail.connect(self.update_tasks)
+
         # 任务完成时，自动回到上一窗口
         self.migrate_task.finished.connect(self.back)
 
+    def init_stats(self):
+        if not self.migrate_task.is_calculating:
+            self.loading_ring.change_percent(1-self.migrate_task.pending_num/self.migrate_task.pending_num_total)
+            if self.migrate_task.pending_num_mod > 0:
+                self.task_list.update_task('mod', percent=1-self.migrate_task.pending_num_mod/self.migrate_task.pending_num_mod_total, task_status=MigrateDetail.TaskStatus.IN_PROGRESS)
+                return
+            else:
+                self.task_list.update_task('mod', task_status=MigrateDetail.TaskStatus.COMPLETED)
+            if self.migrate_task.pending_num_file > 0:
+                self.task_list.update_task('file', percent=1-self.migrate_task.pending_num_file/self.migrate_task.pending_num_file_total, task_status=MigrateDetail.TaskStatus.IN_PROGRESS)
+            else: self.task_list.update_task('file', task_status=MigrateDetail.TaskStatus.COMPLETED)
+
     @QtCore.Slot()
     def back(self):
-        self.terminal.switch_window(Terminal.WindowEnum.MIGRATE, version.get_versions(), self.terminal.task_migrate)
+        self.terminal.switch_window(Terminal.WindowEnum.MIGRATE, self.terminal.versions_json, self.terminal.task_migrate)
 
     @QtCore.Slot(int, int)
     def update_tasks(self, pending_num_mod, pending_num_file):

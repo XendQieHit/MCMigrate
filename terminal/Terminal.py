@@ -5,7 +5,8 @@ from PySide6 import QtWidgets, QtCore
 import os, shutil, json, logging
 
 from terminal.func import version, mod, config, utils
-import Message, Dialog, MCException
+from message import Message, Dialog
+import MCException
 
 logging.basicConfig(level=logging.INFO)
 
@@ -13,10 +14,11 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
     def __init__(self, main_window: QtWidgets.QMainWindow):
         super().__init__(__name__)
         self.config = config.get_config()
-        self.pending_num = 0
         self.main_window = main_window
         self.thread_migrate = QtCore.QThread()
         self.task_migrate = None
+        self.versions_json: list[dict]
+        self.refresh_version()
     
     def import_version(self) -> list[dict] | None:
         '''
@@ -43,18 +45,23 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
             return None
 
         # 版本路径解析完毕了，接下来就是加载前端版本列表
-        with open("versions.json", 'r', encoding='utf-8') as f:
-            try:
-                versions = json.load(f)
-                if not versions: # 怎么是空值？
-                    raise IOError("version.json内容为空")
+        try:
+            if versions:= version.get_versions():
+                self.versions_json = versions
                 return versions
-            except (IOError, OSError) as e:
-                self.send_message(f"读取versions.json失败：{e}", Message.Level.ERROR)
-                return None
-            except Exception as e:
-                self.send_message(f"发生了意外的错误：{e}", Message.Level.ERROR)
-                return None
+            raise IOError("version.json内容为空")
+        except (IOError, OSError) as e:
+            self.send_message(f"读取versions.json失败：{e}", Message.Level.ERROR)
+            return None
+        except TypeError:
+            self.send_message(str(e))
+            return None
+        except Exception as e:
+            self.send_message(f"发生了意外的错误：{e}", Message.Level.ERROR)
+            return None
+
+    def refresh_version(self):
+        self.versions_json = version.get_versions()
 
     def switch_window(self, window_enum: 'WindowEnum', *params):
         '''
@@ -126,7 +133,7 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
         return version.parse_version(path, is_indie)
 
     def get_versions(self) -> list[dict]:
-        return version.get_versions()
+        return self.versions_json
     
 
     class WindowEnum(Enum):
@@ -156,6 +163,9 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
             self.target_dir = target_dir
             self.source_json = source_json
             self.target_json = target_json
+
+            # 状态
+            self.is_calculating = True
 
             # 任务总数
             self.pending_num = 0
@@ -191,23 +201,27 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
             self.pending_num_total = self.pending_num
             self.pending_num_file_total = self.pending_num_file
 
+            # 计算待处理任务数量（mod下载）
             not_mod_loader = ['optifine', 'release', 'snapshot', 'unknown']
+            mod_list: List[str] = None
             if (self.source_json['mod_loader'] not in not_mod_loader) and (self.target_json['mod_loader'] not in not_mod_loader):
-                
-                mod_list: List[str] = os.listdir(self.source_dir / "mods")
-                # 计算待处理任务数量（mod下载）
+                mod_list = os.listdir(self.source_dir / "mods")
                 self.pending_num_mod = len(mod_list)
                 self.pending_num += self.pending_num_mod
                 self.pending_num_total = self.pending_num
                 self.pending_num_mod_total = self.pending_num_mod
 
-                # 开始下载mod
+            # 算完任务数量了，接下来就来干正事吧（
+            self.is_calculating = False
+            
+            # 开始下载mod
+            if mod_list:
                 logging.info("下载mod中")
                 if not config.get_config_value('migrate', 'keep-original-mods'):
                     utils.clear_folder(self.target_dir / 'mods')
                 self.download_mods(self.source_dir / "mods", self.target_dir / "mods", self.target_json["version"], self.target_json["mod_loader"], mod_list)
                 logging.info("mod下载完成")
-
+            
             # 开始迁移文件
             logging.info("迁移游戏文件")
             self.migrate_file(self.source_dir, self.target_dir)
@@ -226,11 +240,9 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
                         else: # 文件
                             shutil.copy(item, target_dir / item.name)
                     except PermissionError as e:
-                        print(item, 1)
                         logging.warning("权限不足")
                         self.failed_files_copy.append([item.name, "权限不足"])
                     except Exception as e:
-                        print(item, 0)
                         logging.error("未知错误：" + str(e))
                         self.failed_files_copy.append([item.name, e])
                 self.reduce_pending_num_file()
