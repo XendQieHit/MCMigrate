@@ -28,7 +28,8 @@ class DialogWindow(QtWidgets.QWidget):
         level: Level,
         content_text: str,
         parent_widget: QtWidgets.QWidget,
-        *buttons: tuple[str, Level, Callable[[], None]]
+        *buttons: tuple[str, Level, Callable[[], None]],
+        **kwargs
     ):
         super().__init__(parent=parent_widget)
         self.parent_widget = parent_widget
@@ -84,11 +85,14 @@ class DialogWindow(QtWidgets.QWidget):
         # 添加按钮
         if buttons:
             for button in buttons:
-                self.button_section.layout().addWidget(DialogWindow.DialogButton(button[0], button[1], button[2]))
+                if button:
+                    self.button_section.layout().addWidget(DialogWindow.DialogButton(button[0], button[1], button[2]))
         
         # 取消按钮
         self.button_cancel = DialogWindow.DialogButton('取消', Level.INFO, self.close_with_animation)
         self.button_section.layout().addWidget(self.button_cancel)
+        if text:= kwargs.get('change_cancel_btn_text', False):
+            self.button_cancel.setText(text)
 
         # 准备动画展示，先隐藏界面
         self.effect_opacity = QtWidgets.QGraphicsOpacityEffect(opacity=0.0)
@@ -150,12 +154,12 @@ class Dialog:
         self.parent_widget = parent_widget
         self.current_dialog: DialogWindow = None
 
-    def show_dialog(self, title: str, level: Level, content_text: str, *buttons):
+    def show_dialog(self, title: str, level: Level, content_text: str, *buttons, **kwargs):
         if self.current_dialog:
             self.current_dialog.close()
             self.current_dialog.deleteLater()
             self.current_dialog = None
-        self.current_dialog = DialogWindow(title, level, content_text, self.parent_widget, *buttons)
+        self.current_dialog = DialogWindow(title, level, content_text, self.parent_widget, *buttons, **kwargs)
         self.current_dialog.show_with_animation()
         return self.current_dialog
 
@@ -172,9 +176,13 @@ class Dialog:
         return self.show_dialog(title, Level.DONE, content_text, *buttons)
     
 class Dialogable(QtCore.QObject):
-    dialog_requested = QtCore.Signal(str, Level, str, *tuple[str, Level, Callable[[], None]])
-    def __init__(self):
-        super().__init__()
-
-    def send_dialog(self, title: str, level: Level, content_text: str, *buttons):
-        self.dialog_requested.emit(title, level, content_text, *buttons)
+    # 只定义 4 个参数：title, level, content, options（包含 buttons + kwargs）
+    dialog_requested = QtCore.Signal(str, object, str, object)  # object 可容纳任何 Python 对象
+    
+    def send_dialog(self, title: str, level, content_text: str, *buttons, **kwargs):
+        # 打包所有可变数据到一个 dict（或自定义对象）
+        payload = {
+            'buttons': buttons,  # tuple of tuples
+            'options': kwargs    # 其他配置
+        }
+        self.dialog_requested.emit(title, level, content_text, payload)

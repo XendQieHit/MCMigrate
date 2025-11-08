@@ -10,4 +10,6 @@ migrate:
   - logs
   - PCL
   filter_rule: excludes
+  # 保留迁移到的目标版本的模组
+  keep-original-mods: false
   screenshots: true

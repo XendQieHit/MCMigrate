@@ -56,7 +56,7 @@ def modrinth(target_version: str, mod_loader: str, source_dir: str, old_file_nam
         logger.error(f"怎么会写入失败呢: {e}")
         return False
 
-
+# Curseforge API的使用必须要用到开发者密钥，但我暂时还不知道怎么隐藏密钥的同时能让玩家能访问API，总不可能我整一个远程服务器发密钥吧（（（
 def curseforge(target_version: str, mod_loader: str, resource_dir: str, old_file_name: str, target_dir: str, not_adapt_mods: List[str]):
     curseforge_hash: int = gen_curseforge_hash(resource_dir, old_file_name)
     logger.info(curseforge_hash)
@@ -69,7 +69,7 @@ def curseforge(target_version: str, mod_loader: str, resource_dir: str, old_file
     }
 
     try:
-        response = requests.post("https://api.curseforge.com/v1/fingerprints/", headers=headers, json=request_body)
+        response = requests.post("https://api.curseforge.com/v1/fingerprints/", headers=headers, json=request_body, timeout=60)
         if not response.ok:
             logger.warning("[curseforge]链接炸了或无适配版本")
             return False

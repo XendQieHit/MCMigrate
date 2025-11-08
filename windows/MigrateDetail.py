@@ -1,21 +1,18 @@
-import sys, os
-# sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) # 单独调试时的代码
-
-import logging, json, os
 from enum import Enum
 from PySide6 import QtWidgets, QtGui, QtCore
-# app = QtWidgets.QApplication(sys.argv)
 from terminal.Terminal import Terminal
-from pathlib import Path
 
 from windows.loadStyleSheet import load_stylesheet
 from windows.Messageable import Messageable
+from terminal.func import version
 import Geometry, GeometryIcon
 
 class MigrateDetail(Messageable):
-    def __init__(self, terminal: Terminal):
+    def __init__(self, terminal: Terminal, migrate_task: Terminal.TaskMigrate, pre_window: QtWidgets.QFrame):
         super().__init__()
+        self.pre_window = pre_window
         self.terminal = terminal
+        self.migrate_task = migrate_task
         self.setLayout(QtWidgets.QHBoxLayout())
         self.layout().setSpacing(30)
         self.layout().setContentsMargins(30,30,30,30)
@@ -29,7 +26,7 @@ class MigrateDetail(Messageable):
         
         # 左侧加载圈
         self.loading_ring = Geometry.LoadingRingText(QtGui.QColor("#79D2B1"), QtGui.QColor("#409A9C"))
-        self.loading_ring.change_percent(0.79)
+        self.loading_ring.change_percent(0.0)
         self.loading_ring_container.layout().addWidget(self.loading_ring, 0, QtCore.Qt.AlignCenter)
 
         # 左侧文字
@@ -47,12 +44,41 @@ class MigrateDetail(Messageable):
         self.button_back.move(15, 15)
         self.raise_()
 
-        # 示例任务
-        self.task_list.add_task("准备迁移数据", MigrateDetail.TaskStatus.COMPLETED)
-        self.aaa = self.task_list.add_task("迁移用户数据", MigrateDetail.TaskStatus.IN_PROGRESS)
-        self.aaa.update_progress(0.45)
-
+        # 解析现在进程有哪些任务，然后添加显示
+        task: list[str] = []
+        # 模组方面
+        self.task_list.add_task('mod', '下载更新模组', MigrateDetail.TaskStatus.IN_PROGRESS)
+        # 文件方面
+        self.task_list.add_task('file', '迁移游戏文件', MigrateDetail.TaskStatus.PENDING)
         self.task_list.layout().addStretch()
+
+        # 数据进度同步更新
+        self.migrate_task.update_migrate_general.connect(self.update_loading_ring)
+        self.migrate_task.update_migrate_detail.connect(self.update_tasks)
+        # 任务完成时，自动回到上一窗口
+        self.migrate_task.finished.connect(self.back)
+
+    @QtCore.Slot()
+    def back(self):
+        self.terminal.switch_window(Terminal.WindowEnum.MIGRATE, version.get_versions(), self.terminal.task_migrate)
+
+    @QtCore.Slot(int, int)
+    def update_tasks(self, pending_num_mod, pending_num_file):
+        if not self.migrate_task.pending_num_mod <= 0:
+            self.task_list.update_task('mod', percent=1-pending_num_mod/self.migrate_task.pending_num_mod_total)
+            return
+        else: 
+            self.task_list.update_task('mod', task_status=MigrateDetail.TaskStatus.COMPLETED)
+            self.task_list.update_task('file', task_status=MigrateDetail.TaskStatus.IN_PROGRESS)
+
+        if not self.migrate_task.pending_num_file <= 0:
+            self.task_list.update_task('file', percent=1-pending_num_file/self.migrate_task.pending_num_file_total)
+            return
+        else: self.task_list.update_task('file', task_status=MigrateDetail.TaskStatus.COMPLETED)
+
+    @QtCore.Slot(int)
+    def update_loading_ring(self, pending_num):
+        self.loading_ring.change_percent(1-pending_num/self.migrate_task.pending_num_total)
 
     class TaskList(QtWidgets.QFrame):
         def __init__(self):
@@ -63,27 +89,42 @@ class MigrateDetail(Messageable):
             self.setFixedWidth(380)
             self.layout().setSpacing(5)
             self.setContentsMargins(10,5,10,5)
-            self.tasks = []
+            self.tasks: list[MigrateDetail.TaskBar] = []
 
-        def add_task(self, task_name: str, task_status: 'MigrateDetail.TaskStatus') -> 'MigrateDetail.TaskBar':
-            task = MigrateDetail.TaskBar(task_name=task_name, status=task_status, parent=self)
+        def add_task(self, task_id: str, task_name: str, task_status: 'MigrateDetail.TaskStatus') -> 'MigrateDetail.TaskBar':
+            task = MigrateDetail.TaskBar(task_id=task_id, task_name=task_name, status=task_status, parent=self)
             self.layout().addWidget(task)
             self.tasks.append(task)
             return task
 
-    class TaskStatus(Enum):
-        PENDING = ("pending", GeometryIcon.Pending("#2196F3"))
-        IN_PROGRESS = ("in_progress", GeometryIcon.Pending("#2196F3"))
-        COMPLETED = ("completed", GeometryIcon.Completed("#4CAF50"))
-        FAILED = ("failed", GeometryIcon.Failed("#F44336"))
+        def update_task(self, task_id: str, percent: float=None, task_status: 'MigrateDetail.TaskStatus'=None):
+            for task in self.tasks:
+                if task.task_id == task_id:
+                    if task_status: 
+                        task.switch_status(task_status)
+                        if task_status == MigrateDetail.TaskStatus.COMPLETED: task.update_progress(1.0)
+                    if percent: task.update_progress(percent)
+            
 
-        def __init__(self, text: str, icon: QtWidgets.QWidget):
+    class TaskStatus(Enum):
+        PENDING = ("pending", GeometryIcon.Pending, "#2196F3")
+        IN_PROGRESS = ("in_progress", GeometryIcon.Pending, "#2196F3")
+        COMPLETED = ("completed", GeometryIcon.Completed, "#4CAF50")
+        FAILED = ("failed", GeometryIcon.Failed, "#F44336")
+
+        def __init__(self, text: str, clazz: type, color: str):
             self.text = text
-            self.icon = icon
-    
+            self.clazz = clazz
+            self.color = color
+
+        @property
+        def instance(self) -> QtWidgets.QWidget:
+            return self.clazz(self.color)
+
     class TaskBar(QtWidgets.QFrame):
-        def __init__(self, task_name: str, status: 'MigrateDetail.TaskStatus' = None, parent=None, length=300):
+        def __init__(self, task_id: str, task_name: str, status: 'MigrateDetail.TaskStatus' = None, parent=None, length=300):
             super().__init__(parent)
+            self.task_id = task_id
             self.task_name = task_name
             if status is None:
                 status = MigrateDetail.TaskStatus.PENDING
@@ -104,7 +145,7 @@ class MigrateDetail(Messageable):
             self.layout().addWidget(self.info_container)
 
             # 状态图标和进度
-            self.status_icon = self.status.icon
+            self.status_icon = self.status.instance
             self.status_icon.setObjectName("statusIcon")
             self.status_icon.setStyleSheet(load_stylesheet("qss/migrate_detail.qss"))
             self.status_percent = QtWidgets.QLabel()
@@ -139,13 +180,15 @@ class MigrateDetail(Messageable):
         def switch_status(self, status: 'MigrateDetail.TaskStatus'):
             if status == MigrateDetail.TaskStatus.IN_PROGRESS:
                 self.info_container.layout().replaceWidget(self.status_icon, self.status_percent)
+                self.status_icon.close()
             elif status in [
                     MigrateDetail.TaskStatus.COMPLETED, 
                     MigrateDetail.TaskStatus.FAILED,
                     MigrateDetail.TaskStatus.PENDING
                 ]:
-                self.status_icon = status.icon
+                self.status_icon = status.instance
                 self.info_container.layout().replaceWidget(self.status_percent, self.status_icon)
+                self.status_percent.close()
             self.status = status
 
         def update_progress(self, percent: float):
@@ -154,24 +197,11 @@ class MigrateDetail(Messageable):
             self.loading_line.change_percent(self.process_percent)
     
     class ButtonBack(QtWidgets.QPushButton):
-        def __init__(self, parent: QtWidgets.QFrame):
+        def __init__(self, parent: 'MigrateDetail'):
             super().__init__(parent=parent)
             self.setFixedSize(45, 45)
             self.setObjectName('buttonBack')
             self.setStyleSheet(load_stylesheet('qss/migrate_detail.qss'))
             self.setLayout(QtWidgets.QHBoxLayout())
             self.layout().addWidget(Geometry.Arrow(self, self, color="#79D2B1", angle=-180))
-            self.clicked.connect(lambda: self.button_clicked(self.parent()))
-
-        def button_clicked(parent):
-            pass
-    
-if __name__ == "__main__":
-    import sys
-    
-    window = QtWidgets.QMainWindow()
-    terminal = Terminal(window)
-    md = MigrateDetail(terminal=terminal)
-    terminal.main_window.setCentralWidget(md)
-    terminal.main_window.show()
-    sys.exit(app.exec())
+            self.clicked.connect(parent.back)

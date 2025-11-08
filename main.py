@@ -25,10 +25,12 @@ def show_message_slot(msg: str, level):
     current_widget = window.centralWidget()
     if hasattr(current_widget, 'message'):
         current_widget.message.show_message(msg, level)
-def show_dialog_slot(title: str, level, content_text: str, *buttons):
+def show_dialog_slot(title: str, level, content_text: str, payload: dict):
+    buttons = payload['buttons']      # tuple
+    kwargs = payload['options']      # dict
     current_widget = window.centralWidget()
     if hasattr(current_widget, 'dialog'):
-        current_widget.dialog.show_dialog(title, level, content_text, *buttons)
+        current_widget.dialog.show_dialog(title, level, content_text, *buttons, **kwargs)
 terminal.message_requested.connect(show_message_slot)
 terminal.dialog_requested.connect(show_dialog_slot)
 version.dialog.dialog_requested.connect(show_dialog_slot)

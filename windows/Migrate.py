@@ -1,20 +1,20 @@
 import logging, json
 from PySide6 import QtWidgets, QtGui, QtCore
-from PySide6.QtSvgWidgets import QSvgWidget
 from terminal.Terminal import Terminal
 from pathlib import Path
 
 from windows.Messageable import Messageable
-import Message, Dialog
+import Message, Dialog, MCException
 from windows.loadStyleSheet import load_stylesheet
 import windows
 import Geometry
 
 class Migrate(Messageable):
-    def __init__(self, terminal: Terminal, version_paths: list[dict]):
+    def __init__(self, terminal: Terminal, version_paths: list[dict], migrate_task: Terminal.TaskMigrate=None):
         super().__init__()
         self.versions = version_paths
         self.terminal = terminal
+        self.migrate_task = migrate_task
         self.setWindowTitle("MCMigrator")
         self.setWindowIcon(QtGui.QIcon("assets/icon_64x64.png"))
         self.layout = QtWidgets.QVBoxLayout()
@@ -53,6 +53,14 @@ class Migrate(Messageable):
         self.setLayout(self.layout)
         self.resize(800, 400)
 
+        # 如果已经有迁移任务在进行，把任务详情的悬浮窗添加进来
+        if self.migrate_task:
+            self.button_migrate_detail = ButtonMigrateDetail(self.terminal, self)
+            self.button_migrate_detail.set_migrate_task(self.migrate_task)
+            self.migrate_task.update_migrate_general.connect(self.button_migrate_detail.change_percent)
+            self.button_migrate_detail.show_directly()
+            self.terminal.thread_migrate.finished.connect(self.button_migrate_detail.close_with_animation)
+
     def button_import_clicked(self):
         if versions:= self.terminal.import_version():
             self.versions = versions
@@ -75,13 +83,19 @@ class Migrate(Messageable):
 
         # 添加任务详情悬浮按钮
         self.button_migrate_detail = ButtonMigrateDetail(self.terminal, self)
-        self.button_migrate_detail.show_with_animation()
         self.terminal.thread_migrate.finished.connect(self.button_migrate_detail.close_with_animation)
         self.message.info(f"正在迁移 {ver_source.json.get('name')} 至 {ver_target.json.get('name')}")
         
         # 开始线程任务
-        self.terminal.migrate(source_json=ver_source.json, target_json=ver_target.json, use_pending_num_func=self.button_migrate_detail.change_percent)
-
+        try:
+            self.terminal.migrate(source_json=ver_source.json, target_json=ver_target.json)
+        except MCException.VersionVerifyFailed as e:
+            self.message.show_message(str(e), e.level)
+            self.button_migrate_detail.close()
+            return
+        self.button_migrate_detail.set_migrate_task(self.terminal.task_migrate)
+        self.terminal.task_migrate.update_migrate_general.connect(self.button_migrate_detail.change_percent)
+        self.button_migrate_detail.show_with_animation()
         
     
     def percent_update(self, timer: QtCore.QTimer, ring: Geometry.LoadingRingText):
@@ -368,6 +382,7 @@ class Migrate(Messageable):
             logging.info("已更新版本列表")
             
 class ButtonMigrateDetail(QtWidgets.QPushButton):
+    '''任务详情的按钮，在被调用之前必须先set_migrate_task()'''
     def __init__(self, terminal: Terminal, parent_widget):
         super().__init__(parent=parent_widget)
         self.terminal = terminal
@@ -378,9 +393,9 @@ class ButtonMigrateDetail(QtWidgets.QPushButton):
         layout_detail = QtWidgets.QVBoxLayout()
         self.setLayout(layout_detail)
         self.setStyleSheet(load_stylesheet("qss/migrate.qss"))
-        self.clicked.connect(lambda: self.terminal.switch_window(Terminal.WindowEnum.MIGRATE_DETAIL, self.terminal))
 
         self.ring = Geometry.LoadingRingText(QtGui.QColor("#EDEDFF"), QtGui.QColor("#EDEDFF"))
+        self.ring.change_percent(0.0)
         self.ring.setStyleSheet("background: transparent")
         layout_detail.addWidget(self.ring, 1, QtCore.Qt.AlignCenter)
         
@@ -391,6 +406,10 @@ class ButtonMigrateDetail(QtWidgets.QPushButton):
         self.shadow.setFixedSize(self._size, self._size)
         self.shadow.setStyleSheet("background-color: '#5f9772'; border-radius: 35px")
         self.move(self.parentWidget().width() - self._size - 20, self.parentWidget().height() - self._size - 20)
+    
+    def set_migrate_task(self, migrate_task: Terminal.TaskMigrate):
+        # 点击后转至MigrateDetail界面
+        self.clicked.connect(lambda: self.terminal.switch_window(Terminal.WindowEnum.MIGRATE_DETAIL, migrate_task, self.parent()))
     
     @QtCore.Slot(int)
     def change_percent(self, num: int):
@@ -443,6 +462,11 @@ class ButtonMigrateDetail(QtWidgets.QPushButton):
         self.anim_group.addAnimation(shadow_scale)
         self.anim_group.addAnimation(shadow_fade)
         self.anim_group.start(QtCore.QAbstractAnimation.DeleteWhenStopped)
+
+    def show_directly(self):
+        self.move(self.parentWidget().width() - self._size - 20, self.parentWidget().height() - self._size - 50)
+        self.show()
+        self.shadow.close()
 
     def close_with_animation(self):
         # === 按钮弹入动画 ===
