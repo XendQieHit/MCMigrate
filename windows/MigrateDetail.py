@@ -4,6 +4,7 @@ from terminal.Terminal import Terminal
 
 from windows.loadStyleSheet import load_stylesheet
 from windows.SendMessageable import SendMessageable
+from terminal.func.utils import resource_path
 import Geometry, GeometryIcon
 
 class MigrateDetail(SendMessageable):
@@ -31,7 +32,7 @@ class MigrateDetail(SendMessageable):
         # 左侧文字
         self.loading_ring_text = QtWidgets.QLabel("迁移中", self)
         self.loading_ring_text.setObjectName("loadingRingText")
-        self.loading_ring_text.setStyleSheet(load_stylesheet('qss/migrate_detail.qss'))
+        self.loading_ring_text.setStyleSheet(load_stylesheet(resource_path('qss/migrate_detail.qss')))
         self.loading_ring_container.layout().addWidget(self.loading_ring_text, 0, QtCore.Qt.AlignCenter)
 
         # 右侧进度详情
@@ -48,7 +49,6 @@ class MigrateDetail(SendMessageable):
         # 文件方面
         self.task_list.add_task('file', '迁移游戏文件', MigrateDetail.TaskStatus.PENDING)
         self.task_list.layout().addStretch()
-        # （未来如果支持多线程迁移任务的话，就要把上面那个手动添加任务的，改为解析现在进程有哪些任务，然后添加显示）
 
         # 初始化进度数据
         self.init_stats()
@@ -99,7 +99,7 @@ class MigrateDetail(SendMessageable):
             super().__init__()
             self.setLayout(QtWidgets.QVBoxLayout())
             self.setObjectName('taskList')
-            self.setStyleSheet(load_stylesheet("qss/migrate_detail.qss"))
+            self.setStyleSheet(load_stylesheet(resource_path("qss/migrate_detail.qss")))
             self.setFixedWidth(380)
             self.layout().setSpacing(5)
             self.setContentsMargins(10,5,10,5)
@@ -118,7 +118,6 @@ class MigrateDetail(SendMessageable):
                         task.switch_status(task_status)
                         if task_status == MigrateDetail.TaskStatus.COMPLETED: task.update_progress(1.0)
                     if percent: task.update_progress(percent)
-            
 
     class TaskStatus(Enum):
         PENDING = ("pending", GeometryIcon.Pending, "#2196F3")
@@ -161,10 +160,10 @@ class MigrateDetail(SendMessageable):
             # 状态图标和进度
             self.status_icon = self.status.instance
             self.status_icon.setObjectName("statusIcon")
-            self.status_icon.setStyleSheet(load_stylesheet("qss/migrate_detail.qss"))
+            self.status_icon.setStyleSheet(load_stylesheet(resource_path("qss/migrate_detail.qss")))
             self.status_percent = QtWidgets.QLabel()
             self.status_percent.setObjectName("statusPercent")
-            self.status_percent.setStyleSheet(load_stylesheet('qss/migrate_detail.qss'))
+            self.status_percent.setStyleSheet(load_stylesheet(resource_path('qss/migrate_detail.qss')))
             self.status_percent.setText(f"{int(self.process_percent * 100)}%")
             if self.status == MigrateDetail.TaskStatus.IN_PROGRESS:
                 self.info_container.layout().addWidget(self.status_percent)
@@ -174,14 +173,14 @@ class MigrateDetail(SendMessageable):
             # 任务名称
             self.label_task_name = QtWidgets.QLabel(self.task_name, self)
             self.label_task_name.setObjectName("taskName")
-            self.label_task_name.setStyleSheet(load_stylesheet('qss/migrate_detail.qss'))
+            self.label_task_name.setStyleSheet(load_stylesheet(resource_path('qss/migrate_detail.qss')))
             self.info_container.layout().addWidget(self.label_task_name)
             self.info_container.layout().addStretch()
 
             # 进度条
             self.loading_line = Geometry.LoadingLine(color=QtGui.QColor("#79D2B1"), pen_width=3, length=length-40)
             self.loading_line.setObjectName('loadingLine')
-            self.loading_line.setStyleSheet(load_stylesheet('qss/migrate_detail.qss'))
+            self.loading_line.setStyleSheet(load_stylesheet(resource_path('qss/migrate_detail.qss')))
             self.loading_line.change_percent(self.process_percent)
             self.layout().addWidget(self.loading_line)
 
@@ -189,7 +188,7 @@ class MigrateDetail(SendMessageable):
             self.setSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Fixed)
             self.adjustSize()
             self.setObjectName("taskBar")
-            self.setStyleSheet(load_stylesheet("qss/migrate_detail.qss"))
+            self.setStyleSheet(load_stylesheet(resource_path("qss/migrate_detail.qss")))
 
         def switch_status(self, status: 'MigrateDetail.TaskStatus'):
             if status == MigrateDetail.TaskStatus.IN_PROGRESS:
@@ -215,7 +214,7 @@ class MigrateDetail(SendMessageable):
             super().__init__(parent=parent)
             self.setFixedSize(45, 45)
             self.setObjectName('buttonBack')
-            self.setStyleSheet(load_stylesheet('qss/migrate_detail.qss'))
+            self.setStyleSheet(load_stylesheet(resource_path('qss/migrate_detail.qss')))
             self.setLayout(QtWidgets.QHBoxLayout())
             self.layout().addWidget(Geometry.Arrow(self, self, color="#79D2B1", angle=-180))
             self.clicked.connect(parent.back)

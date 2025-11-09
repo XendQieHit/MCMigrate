@@ -4,6 +4,7 @@ from enum import Enum
 import sys, logging
 from PIL import ImageColor
 from windows.loadStyleSheet import load_stylesheet
+from terminal.func.utils import resource_path
 
 class Level(Enum):
     INFO = (1, "#5cb7ef", "#34566c5f", "#7bccff2b", "#ffffff")
@@ -49,7 +50,7 @@ class DialogWindow(QtWidgets.QWidget):
         self.dialog_window = QtWidgets.QWidget(self)
         self.dialog_window.setFixedSize(500, 240)
         self.dialog_window.setObjectName("dialogWindow")
-        self.dialog_window.setStyleSheet(load_stylesheet("qss/dialog.qss"))
+        self.dialog_window.setStyleSheet(load_stylesheet(resource_path("qss/dialog.qss")))
         self.dialog_window.setLayout(QtWidgets.QVBoxLayout())
         self.dialog_window.layout().setSpacing(5)
         self.dialog_window.setContentsMargins(0, 0, 0, 0)
@@ -62,7 +63,7 @@ class DialogWindow(QtWidgets.QWidget):
         # 内容文本
         self.content_text = QtWidgets.QLabel(content_text, self.dialog_window)
         self.content_text.setObjectName("contentText")
-        self.content_text.setStyleSheet(load_stylesheet("qss/dialog.qss"))
+        self.content_text.setStyleSheet(load_stylesheet(resource_path("qss/dialog.qss")))
         self.content_text.setMaximumWidth(self.dialog_window.width() - 30)
         self.content_text.setWordWrap(True)
         self.content_text.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Expanding)
@@ -72,7 +73,7 @@ class DialogWindow(QtWidgets.QWidget):
         self.content_text_view.setWidget(self.content_text)
         self.content_text_view.setWidgetResizable(True)
         self.content_text_view.setObjectName('contentTextView')
-        self.content_text_view.setStyleSheet(load_stylesheet("qss/dialog.qss"))
+        self.content_text_view.setStyleSheet(load_stylesheet(resource_path("qss/dialog.qss")))
         self.dialog_window.layout().addWidget(self.content_text_view)
 
         # 按钮区
@@ -81,7 +82,7 @@ class DialogWindow(QtWidgets.QWidget):
         self.button_section.setLayout(QtWidgets.QHBoxLayout())
         self.button_section.layout().setAlignment(QtCore.Qt.AlignmentFlag.AlignRight)
         self.button_section.setObjectName("buttonSection")
-        self.button_section.setStyleSheet(load_stylesheet('qss/dialog.qss'))
+        self.button_section.setStyleSheet(load_stylesheet(resource_path("qss/dialog.qss")))
         self.dialog_window.layout().addWidget(self.button_section, 0)
         # 添加按钮
         if buttons:

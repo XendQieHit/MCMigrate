@@ -50,10 +50,8 @@ version.dialog.dialog_requested.connect(show_dialog_slot)
 version.message.message_requested.connect(show_message_slot)
 
 if os.path.exists("versions.json") and os.path.getsize("versions.json") > 0:
-    with open("versions.json", 'r', encoding='utf-8') as f:
         try:
-            version_paths = json.load(f)
-            if version_paths == []: 
+            if (version_paths:= version.get_versions()) == []: 
                 window.setCentralWidget(Welcome(terminal=terminal))
             else:
                 migrate = Migrate(terminal=terminal, version_paths=version_paths)

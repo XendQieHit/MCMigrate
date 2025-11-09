@@ -1,6 +1,6 @@
 from pathlib import Path
 from typing import List
-import json, re, zipfile
+import json, re, zipfile, os
 import logging, MCException
 
 from message import Message, Dialog
@@ -203,8 +203,14 @@ def parse_version(path: Path, is_indie=True) -> dict:
     except Exception as e: # 万策尽QAQ————
         logger.error("无法解析版本号: %s", e)
         return None
+    
+def gen_new_versions() -> list[dict]:
+    with open("versions.json", "w", encoding='utf-8') as f:
+        json.dump([], f)
 
 def get_versions() -> list[dict]:
+    if not os.path.exists("versions.json") or os.path.getsize("versions.json") < 8:
+        gen_new_versions()
     try:
         with open("versions.json", "r", encoding="utf-8") as f:
             versions = json.load(f)

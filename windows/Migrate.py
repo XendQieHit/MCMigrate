@@ -6,6 +6,7 @@ from pathlib import Path
 from windows.SendMessageable import SendMessageable
 from message import Message, Dialog
 from windows.loadStyleSheet import load_stylesheet
+from terminal.func.utils import resource_path
 import Geometry, MCException
 
 class Migrate(SendMessageable):
@@ -15,7 +16,7 @@ class Migrate(SendMessageable):
         self.terminal = terminal
         self.migrate_task = migrate_task
         self.setWindowTitle("MCMigrator")
-        self.setWindowIcon(QtGui.QIcon("assets/icon_64x64.png"))
+        self.setWindowIcon(QtGui.QIcon(resource_path("assets/icon_64x64.png")))
         self.layout = QtWidgets.QVBoxLayout()
 
         # 顶部栏
@@ -30,7 +31,7 @@ class Migrate(SendMessageable):
         self.top_bar.layout().setContentsMargins(0,0,0,0)
         # github链接
         self.github_url = QtWidgets.QPushButton()
-        self.github_url.setIcon(QtGui.QIcon('assets/icon/github.svg'))
+        self.github_url.setIcon(QtGui.QIcon(resource_path('assets/icon/github.svg')))
         self.github_url.clicked.connect(lambda: self.dialog.info(
             "即将跳转至Github",
             "即将前往MCMigrate的Github仓库。\n如果在使用MCMigrate过程中遇到了Bug，或是其他想要的功能，可以在MCMigrate的Github仓库上的提出Issue来！",
@@ -62,11 +63,11 @@ class Migrate(SendMessageable):
         self.button_box = QtWidgets.QHBoxLayout()
         self.button_import = QtWidgets.QPushButton("导入版本路径")
         self.button_import.setObjectName("button_import")
-        self.button_import.setStyleSheet(load_stylesheet("qss/migrate.qss"))
+        self.button_import.setStyleSheet(load_stylesheet(resource_path("qss/migrate.qss")))
         self.button_import.clicked.connect(self.button_import_clicked)
         self.button_migrate = QtWidgets.QPushButton("开始迁移")
         self.button_migrate.setObjectName("button_migrate")
-        self.button_migrate.setStyleSheet(load_stylesheet("qss/migrate.qss"))
+        self.button_migrate.setStyleSheet(load_stylesheet(resource_path("qss/migrate.qss")))
         self.button_migrate.clicked.connect(self.button_migrate_clicked)
         self.button_box.addWidget(self.button_import)
         self.button_box.addWidget(self.button_migrate)
@@ -143,14 +144,14 @@ class Migrate(SendMessageable):
             # 加载器图标
             self.mod_loader_icon = self.get_icon(self.json.get('mod_loader', 'unknown'))
             self.mod_loader_icon.setObjectName("mod_loader_icon")
-            self.setStyleSheet(load_stylesheet("qss/migrate.qss"))
-            self.mod_loader_icon.setStyleSheet(load_stylesheet("qss/migrate.qss"))
+            self.setStyleSheet(load_stylesheet(resource_path("qss/migrate.qss")))
+            self.mod_loader_icon.setStyleSheet(load_stylesheet(resource_path("qss/migrate.qss")))
             self.layout().addWidget(self.mod_loader_icon, 0)
 
             # 版本信息容器
             self.info = QtWidgets.QWidget()
             self.info.setObjectName('info')
-            self.info.setStyleSheet(load_stylesheet("qss/migrate.qss"))
+            self.info.setStyleSheet(load_stylesheet(resource_path("qss/migrate.qss")))
             self.info_layout = QtWidgets.QVBoxLayout()
             self.info_layout.setSpacing(0)
             self.info_layout.setContentsMargins(0, 0, 0, 0)
@@ -160,7 +161,7 @@ class Migrate(SendMessageable):
             # 游戏版本名及其加载器、版本隔离标签的容器
             self.info_name = QtWidgets.QWidget()
             self.info_name.setObjectName('info_name')
-            self.info_name.setStyleSheet(load_stylesheet("qss/migrate.qss"))
+            self.info_name.setStyleSheet(load_stylesheet(resource_path("qss/migrate.qss")))
             self.info_name_layout = QtWidgets.QHBoxLayout()
             self.info_name.setLayout(self.info_name_layout)
             self.info_layout.addWidget(self.info_name)
@@ -168,20 +169,20 @@ class Migrate(SendMessageable):
             # 加载器标签
             self.mod_loader = QtWidgets.QLabel(json.get('mod_loader', '未知Mod加载器'))
             self.mod_loader.setObjectName('mod_loader_label')
-            self.mod_loader.setStyleSheet(load_stylesheet("qss/migrate.qss"))
+            self.mod_loader.setStyleSheet(load_stylesheet(resource_path("qss/migrate.qss")))
             self.info_name_layout.addWidget(self.mod_loader, 0)
 
             # 版本隔离标签
             if not json.get('is_indie', False):
                 self.is_indie = QtWidgets.QLabel('非隔离版本')
                 self.is_indie.setObjectName('indie_label')
-                self.is_indie.setStyleSheet(load_stylesheet("qss/migrate.qss"))
+                self.is_indie.setStyleSheet(load_stylesheet(resource_path("qss/migrate.qss")))
                 self.info_name_layout.addWidget(self.is_indie, 0)
 
             # 游戏版本名
             self.name = QtWidgets.QLabel(json.get('name', "未知版本名"))
             self.name.setObjectName('name_label')
-            self.name.setStyleSheet(load_stylesheet("qss/migrate.qss"))
+            self.name.setStyleSheet(load_stylesheet(resource_path("qss/migrate.qss")))
             self.info_name_layout.addWidget(self.name, 1)
 
             self.info_name_layout.addStretch()
@@ -189,7 +190,7 @@ class Migrate(SendMessageable):
             # 版本号标签和版本文件路径的容器
             self.info_detail = QtWidgets.QWidget()
             self.info_detail.setObjectName('info_detail')
-            self.info_detail.setStyleSheet(load_stylesheet("qss/migrate.qss"))
+            self.info_detail.setStyleSheet(load_stylesheet(resource_path("qss/migrate.qss")))
             self.info_detail_layout = QtWidgets.QHBoxLayout()
             self.info_detail.setLayout(self.info_detail_layout)
             self.info_layout.addWidget(self.info_detail)
@@ -197,13 +198,13 @@ class Migrate(SendMessageable):
             # 版本号
             self.ver = QtWidgets.QLabel(json.get('version', '未知版本'))
             self.ver.setObjectName("version_label")
-            self.ver.setStyleSheet(load_stylesheet("qss/migrate.qss"))
+            self.ver.setStyleSheet(load_stylesheet(resource_path("qss/migrate.qss")))
             self.info_detail_layout.addWidget(self.ver, 0)
 
             # 版本文件路径
             self.path = QtWidgets.QLabel(json.get('game_path', '未知路径'))
             self.path.setObjectName("path_label")
-            self.path.setStyleSheet(load_stylesheet("qss/migrate.qss"))
+            self.path.setStyleSheet(load_stylesheet(resource_path("qss/migrate.qss")))
             self.info_detail_layout.addWidget(self.path, 1)
 
             self.info_detail_layout.addStretch()
@@ -229,23 +230,23 @@ class Migrate(SendMessageable):
 
         def get_icon(self, mod_loader: str = None) -> QtWidgets.QLabel:
             mod_loaders = {
-                "fabric": "assets/icon/fabric.png",
-                "neoforge": "assets/icon/neoforge.png",
-                "forge": "assets/icon/forge.png",
-                "quilt": "assets/icon/quilt.png",
-                "release": "assets/icon/release.png",
-                "optifine": "assets/icon/optifine.png",
-                "snapshot": "assets/icon/snapshot.png",
-                "unknown": "assets/icon/unknown.png"
+                "fabric": resource_path("assets/icon/fabric.png"),
+                "neoforge": resource_path("assets/icon/neoforge.png"),
+                "forge": resource_path("assets/icon/forge.png"),
+                "quilt": resource_path("assets/icon/quilt.png"),
+                "release": resource_path("assets/icon/release.png"),
+                "optifine": resource_path("assets/icon/optifine.png"),
+                "snapshot": resource_path("assets/icon/snapshot.png"),
+                "unknown": resource_path("assets/icon/unknown.png")
             }
             for key in mod_loaders.keys():
-                if key in mod_loader.lower():
+                if key in (mod_loader or "").lower():
                     pixmap = QtGui.QPixmap(mod_loaders[key]).scaled(36, 36)
                     label = QtWidgets.QLabel()
                     label.setPixmap(pixmap)
                     return label
                     
-            pixmap = QtGui.QPixmap("assets/icon/unknown.png").scaled(36, 36)
+            pixmap = QtGui.QPixmap(resource_path("assets/icon/unknown.png")).scaled(36, 36)
             label = QtWidgets.QLabel()
             label.setPixmap(pixmap)
             return label
@@ -262,25 +263,25 @@ class Migrate(SendMessageable):
 
                 self.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Expanding)
                 self.setObjectName('float_bar')
-                self.setStyleSheet(load_stylesheet('qss/migrate.qss'))
+                self.setStyleSheet(load_stylesheet(resource_path('qss/migrate.qss')))
 
                 # 打开文件夹
                 # 按钮
                 self.folder_btn = QtWidgets.QPushButton()
                 self.folder_btn.setObjectName('folder_btn')
-                self.folder_btn.setStyleSheet(load_stylesheet('qss/migrate.qss'))
+                self.folder_btn.setStyleSheet(load_stylesheet(resource_path('qss/migrate.qss')))
                 self.folder_btn.setContentsMargins(0,0,0,0)
                 self.folder_btn.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
                 self.folder_btn.setToolTip('打开该版本文件夹')
                 self.folder_btn.clicked.connect(self.open_folder)
-                self.folder_btn.setIcon(QtGui.QIcon('assets/folder.svg'))
+                self.folder_btn.setIcon(QtGui.QIcon(resource_path('assets/folder.svg')))
                 self.layout().addWidget(self.folder_btn)
 
                 # 删除键
                 # 按钮
                 self.del_btn = QtWidgets.QPushButton()
                 self.del_btn.setObjectName('del_btn')
-                self.del_btn.setStyleSheet(load_stylesheet('qss/migrate.qss'))
+                self.del_btn.setStyleSheet(load_stylesheet(resource_path('qss/migrate.qss')))
                 self.del_btn.setContentsMargins(0,0,0,0)
                 self.del_btn.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
                 self.del_btn.setToolTip('从列表中移除该版本（不会删除本体文件）')
@@ -369,7 +370,7 @@ class Migrate(SendMessageable):
             # 样式设置
             for version in version_list:
                 self.add_version(Migrate.VersionItem(version, self))
-            self.setStyleSheet(load_stylesheet("qss/migrate.qss"))
+            self.setStyleSheet(resource_path(load_stylesheet("qss/migrate.qss")))
             self.setSpacing(5)
 
             # 通过监听滑条移动来动态调整实现VersionItem的FloatBar工具栏与列表相对静止
@@ -409,7 +410,7 @@ class ButtonMigrateDetail(QtWidgets.QPushButton):
         self.setFixedSize(self._size, self._size)
         layout_detail = QtWidgets.QVBoxLayout()
         self.setLayout(layout_detail)
-        self.setStyleSheet(load_stylesheet("qss/migrate.qss"))
+        self.setStyleSheet(load_stylesheet(resource_path("qss/migrate.qss")))
 
         self.ring = Geometry.LoadingRingText(QtGui.QColor("#EDEDFF"), QtGui.QColor("#EDEDFF"))
         self.ring.change_percent(0.0)

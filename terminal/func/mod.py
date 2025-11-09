@@ -24,9 +24,9 @@ def modrinth(target_version: str, mod_loader: str, source_dir: str, old_file_nam
         "loaders": [mod_loader],
         "game_versions": [target_version]
     }
-    logger.info(f"headers: {headers}\nrequest_body: {request_body}")
-
     old_version_file_hash = get_file_hash(f"{source_dir / old_file_name}")
+    logger.info(f"{old_file_name}: {old_version_file_hash}")
+    
     try:
         respone = requests.post(f"https://api.modrinth.com/v2/version_file/{old_version_file_hash}/update", headers=headers, params={"algorithm": "sha1"}, json=request_body, timeout=120)
 

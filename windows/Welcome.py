@@ -7,6 +7,7 @@ from pathlib import Path
 from windows.loadStyleSheet import load_stylesheet
 from windows.SendMessageable import SendMessageable
 from message import Message
+from terminal.func.utils import resource_path
 import MCException
 
 # 欢迎界面
@@ -31,7 +32,7 @@ class Welcome(SendMessageable):
         self.button_import.setObjectName('button_import')
         self.button_import.clicked.connect(self.button_import_clicked)
         self.button_import.resize(200, 60)
-        self.button_import.setStyleSheet(load_stylesheet("qss/welcome.qss"))
+        self.button_import.setStyleSheet(load_stylesheet(resource_path("qss/welcome.qss")))
         self.layout.addWidget(self.button_import, 1, QtCore.Qt.AlignCenter)
         self.resize(800, 400)
 
