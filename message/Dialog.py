@@ -2,9 +2,8 @@ from PySide6 import QtWidgets, QtCore, QtGui
 from typing import Callable, Dict
 from enum import Enum
 import sys, logging
-from PIL import ImageColor
 from windows.loadStyleSheet import load_stylesheet
-from terminal.func.utils import resource_path
+from terminal.func.utils import resource_path, hex_rgba_to_tuple
 
 class Level(Enum):
     INFO = (1, "#5cb7ef", "#34566c5f", "#7bccff2b", "#ffffff")
@@ -44,7 +43,7 @@ class DialogWindow(QtWidgets.QWidget):
         # 背景遮罩（全屏半透明）
         self.background = QtWidgets.QFrame(self)
         self.background.setGeometry(0, 0, self.width(), self.height())  # 全屏
-        self.background.setStyleSheet(f"background-color: rgba{ImageColor.getcolor(level.color_bg, "RGBA")}")
+        self.background.setStyleSheet(f"background-color: rgba{hex_rgba_to_tuple(level.color_bg)}")
         
         # 对话框
         self.dialog_window = QtWidgets.QWidget(self)
@@ -138,7 +137,7 @@ class DialogWindow(QtWidgets.QWidget):
     class DialogButton(QtWidgets.QPushButton):
         def __init__(self, text: str, level: Level, func: Callable[[], None]):
             super().__init__(text)
-            self.color_bg = ImageColor.getcolor(level.color_btn, "RGBA")
+            self.color_bg = hex_rgba_to_tuple(level.color_btn)
             self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
             self.setStyleSheet(f"""
                 QPushButton {{

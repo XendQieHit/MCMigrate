@@ -22,6 +22,7 @@ class Migrate(SendMessageable):
         # 顶部栏
         self.top_bar = QtWidgets.QWidget()
         self.top_bar.setLayout(QtWidgets.QHBoxLayout())
+        self.layout.addWidget(self.top_bar, 0)
         # 标题
         self.window_title = QtWidgets.QLabel("选择要迁移的版本", self)
         self.window_title.setStyleSheet("font-size: 18px; color: #666666")
@@ -44,7 +45,14 @@ class Migrate(SendMessageable):
         ))
         self.github_url.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
         self.top_bar.layout().addWidget(self.github_url, 0)
-        self.layout.addWidget(self.top_bar, 0)
+        # 炸弹💣！BOOM！
+        self.crash_btn = QtWidgets.QPushButton()
+        self.crash_btn.setText("💣")
+        self.crash_btn.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
+        def cr():
+            raise RuntimeError("哎呀~被抓到了~^w^")
+        self.crash_btn.clicked.connect(cr)
+        self.top_bar.layout().addWidget(self.crash_btn, 0)
         
         # 版本列表
         self.list_box = QtWidgets.QHBoxLayout()
@@ -288,7 +296,7 @@ class Migrate(SendMessageable):
                 self.del_btn.clicked.connect(self.delete_ver)
                 self.layout().addWidget(self.del_btn)
                 # icon
-                self.del_btn.setIcon(QtGui.QIcon('assets/delete.svg'))
+                self.del_btn.setIcon(QtGui.QIcon(resource_path('assets/delete.svg')))
 
                 self.opacity_effect = QtWidgets.QGraphicsOpacityEffect(self)
                 self.opacity_effect.setOpacity(0.0)

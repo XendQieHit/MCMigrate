@@ -6,11 +6,11 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[('assets', 'assets'), ('qss', 'qss')],
-    hiddenimports=[],
+    hiddenimports=['windows.loadStyleSheet', 'windows.Migrate', 'windows.MigrateDetail', 'windows.SendMessageable', 'windows.Welcome'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=['numpy', 'scipy', 'matplotlib', 'PySide6.Qt3DCore', 'PySide6.Qt3DRender', 'PySide6.QtBluetooth', 'PySide6.QtMultimedia', 'PySide6.QtWebEngineCore', 'PySide6.QtWebEngineWidgets', 'PySide6.QtCharts', 'PySide6.QtDataVisualization', 'PySide6.QtNetwork', 'PySide6.QtOpenGL', 'PySide6.QtPrintSupport', 'PySide6.QtSql', 'PySide6.QtTest', 'PySide6.QtUiTools', 'PySide6.QtXml'],
     noarchive=False,
     optimize=0,
 )

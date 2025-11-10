@@ -1,15 +1,39 @@
 from PySide6 import QtCore, QtWidgets, QtGui
-import os, sys, json
 from terminal.Terminal import Terminal
-from terminal.func import version
-import logging
+from terminal.func import version, utils
+from logging.handlers import TimedRotatingFileHandler
+import os, sys, logging, time
 
 from windows.Migrate import Migrate
 from windows.Welcome import Welcome
-from message import Message, Dialog
+from message import Dialog
 from message.DisplayMessageable import DisplayMessageable
 
-logging.basicConfig(level=logging.INFO)
+# 配置日志文件夹
+BASE_DIR = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
+LOG_DIR = os.path.join(BASE_DIR, 'logs')
+LOG_FILE = os.path.join(LOG_DIR, f'{time.strftime('%Y-%m-%d')}.log')
+os.makedirs(LOG_DIR, exist_ok=True)
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+handler = TimedRotatingFileHandler(
+    filename=os.path.join(LOG_FILE),
+    when="midnight",
+    interval=1,
+    backupCount=7,
+    encoding='utf-8'
+)
+handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+logger.addHandler(handler)
+
+# 捕获 Qt 事件循环中的异常
+# PySide6 的信号/槽异常不会触发 sys.excepthook，需额外处理
+def qt_message_handler(mode, context, message):
+    """可选：捕获 Qt 警告/错误（非 Python 异常）"""
+    if mode == QtCore.QtMsgType.QtCriticalMsg or mode == QtCore.QtMsgType.QtFatalMsg:
+        logging.error(f"Qt Critical: {message} ({context.file}:{context.line})")
+
+QtCore.qInstallMessageHandler(qt_message_handler)
 
 class MainWindow(DisplayMessageable, QtWidgets.QMainWindow):
     change_central_widget = QtCore.Signal()
@@ -26,8 +50,32 @@ class MainWindow(DisplayMessageable, QtWidgets.QMainWindow):
 app = QtWidgets.QApplication([])
 window = MainWindow()
 window.setWindowTitle("MCMigrator")
-window.setWindowIcon(QtGui.QIcon("assets/icon_64x64.png"))
+window.setWindowIcon(QtGui.QIcon(utils.resource_path("assets/icon_64x64.png")))
 window.resize(800, 400)
+
+# 设置全局异常处理器
+def handle_exception(exc_type, exc_value, exc_traceback):
+    """捕获所有未处理异常"""
+    if issubclass(exc_type, KeyboardInterrupt):
+        # 允许 Ctrl+C 正常退出，但真的会有人触发吗（
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+
+    # 记录到日志文件
+    logging.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
+    logging.error("草了，怎么主程序炸了...如果可以的话，请将该日志发在MCMigrate的Github上的Issue里，感谢;w;")
+    # 弹出错误对话框
+    try:
+        window.dialog.error(
+            "不好！",
+            "MCMigrate在运行的时候遇到了不可预测的错误❌\n如果可以的话，麻烦将该日志发在MCMigrate的Github上的Issue里，感谢;w;",
+            ("打开日志文件夹", Dialog.Level.INFO, lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl(QtCore.QUrl.fromLocalFile(LOG_DIR)))),
+            ("前往反馈", Dialog.Level.INFO, lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl("https://github.com/XendQieHit/MCMigrate")))
+        )
+    except Exception:
+        pass  # 弹窗失败则静默
+# 设置全局钩子
+sys.excepthook = handle_exception
 
 # 初始化 Terminal
 terminal = Terminal(window)
@@ -61,7 +109,6 @@ if os.path.exists("versions.json") and os.path.getsize("versions.json") > 0:
             logging.error("解析versions.json文件失败")
             welcome = Welcome(terminal=terminal)
             window.setCentralWidget(welcome)
-            logging.info(welcome)
 else:
     welcome = Welcome(terminal=terminal)
     window.setCentralWidget(welcome)

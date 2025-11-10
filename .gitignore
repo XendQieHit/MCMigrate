@@ -3,6 +3,7 @@ test.py
 exclude.txt
 func/__pycache__
 UI设计图
-build.bat
 build
 dist
+*.spec
+logs
