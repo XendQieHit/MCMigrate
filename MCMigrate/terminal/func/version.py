@@ -65,7 +65,7 @@ def parse_path(path: Path) -> list[dict]:
                 is_confirmed = False
                 for item in list(p.iterdir()):
                     logger.info(item)
-                    if item.is_dir() and item.name == "PCL": # PCL
+                    if item.is_dir() and item.name == "PCL" and Path.exists(item / "Setup.ini"): # PCL
                         logger.info('PCL')
                         versions.append(parse_version(p, is_indie_pcl(item)))
                         is_confirmed = True

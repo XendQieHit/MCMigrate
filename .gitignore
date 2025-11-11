@@ -1,9 +1,10 @@
-versions.json
-test.py
-exclude.txt
-func/__pycache__
+MCMigrate/versions.json
+MCMigrate/config.yml
+MCMigrate/test.py
+MCMigrate/exclude.txt
+MCMigrate/func/__pycache__
+MCMigrate/logs
 UI设计图
 build
 dist
 *.spec
-logs

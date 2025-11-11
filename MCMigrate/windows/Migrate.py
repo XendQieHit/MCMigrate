@@ -370,7 +370,7 @@ class Migrate(SendMessageable):
             # 样式设置
             for version in version_list:
                 self.add_version(Migrate.VersionItem(version, self))
-            self.setStyleSheet(resource_path(load_stylesheet("qss/migrate.qss")))
+            self.setStyleSheet(resource_path(load_stylesheet(resource_path("qss/migrate.qss"))))
             self.setSpacing(5)
 
             # 通过监听滑条移动来动态调整实现VersionItem的FloatBar工具栏与列表相对静止

@@ -2,10 +2,10 @@
 
 
 a = Analysis(
-    ['main.py'],
+    ['MCMigrate\\main.py'],
     pathex=[],
     binaries=[],
-    datas=[('assets', 'assets'), ('qss', 'qss')],
+    datas=[('MCMigrate/assets', 'assets'), ('MCMigrate/qss', 'qss')],
     hiddenimports=['windows.loadStyleSheet', 'windows.Migrate', 'windows.MigrateDetail', 'windows.SendMessageable', 'windows.Welcome'],
     hookspath=[],
     hooksconfig={},

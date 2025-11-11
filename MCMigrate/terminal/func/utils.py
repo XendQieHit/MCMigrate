@@ -15,7 +15,7 @@ def resource_path(relative_path):
     if hasattr(sys, '_MEIPASS'):
         # PyInstaller 打包后，资源在 _MEIPASS 临时目录
         return os.path.join(sys._MEIPASS, relative_path)
-    return os.path.join(os.path.abspath("."), relative_path)
+    return os.path.join(os.path.abspath('./MCMigrate'), relative_path)
 
 def hex_rgba_to_tuple(hex_str: str) -> tuple[int, int, int, int]:
     """

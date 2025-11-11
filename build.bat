@@ -4,7 +4,7 @@ setlocal enabledelayedexpansion
 :: ????? hidden_imports ??????PyInstaller???importlib??????????????
 set "hidden_imports="
 :: ?? windows ????? .py ?????????
-for %%f in (windows\*.py) do (
+for %%f in (MCMigrate\windows\*.py) do (
     set "filename=%%~nf"
     if "!filename!" neq "__init__" (
         set "hidden_imports=!hidden_imports! --hidden-import=windows.!filename!"
@@ -17,8 +17,8 @@ for %%f in (windows\*.py) do (
 pyinstaller --onefile --windowed ^
     --name MCMigrate ^
     --icon=app.ico ^
-    --add-data "assets;assets" ^
-    --add-data "qss;qss" ^
+    --add-data "MCMigrate/assets;assets" ^
+    --add-data "MCMigrate/qss;qss" ^
     %hidden_imports% ^
     --exclude-module numpy ^
     --exclude-module scipy ^
@@ -38,5 +38,5 @@ pyinstaller --onefile --windowed ^
     --exclude-module PySide6.QtTest ^
     --exclude-module PySide6.QtUiTools ^
     --exclude-module PySide6.QtXml ^
-    main.py
+    MCMigrate/main.py
 pause

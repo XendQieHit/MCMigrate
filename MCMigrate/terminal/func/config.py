@@ -15,7 +15,7 @@ if not logger.hasHandlers():
 
 message = Message.Messageable(logger)
 
-CONFIG_PATH = Path('../config.yml')
+CONFIG_PATH = Path('config.yml')
 
 default_config = {
         'migrate':{
