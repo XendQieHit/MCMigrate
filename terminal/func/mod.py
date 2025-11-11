@@ -28,7 +28,7 @@ def modrinth(target_version: str, mod_loader: str, source_dir: str, old_file_nam
     logger.info(f"{old_file_name}: {old_version_file_hash}")
     
     try:
-        respone = requests.post(f"https://api.modrinth.com/v2/version_file/{old_version_file_hash}/update", headers=headers, params={"algorithm": "sha1"}, json=request_body, timeout=120)
+        respone = requests.post(f"https://api.modrinth.com/v2/version_file/{old_version_file_hash}/update", headers=headers, params={"algorithm": "sha1"}, json=request_body, timeout=10)
 
         if not respone.ok:
             logger.warning("[modrinth]链接炸了或无适配版本")
@@ -48,7 +48,7 @@ def modrinth(target_version: str, mod_loader: str, source_dir: str, old_file_nam
         download_url: str = latest_version_json["files"][0]["url"]
         file_name: str = latest_version_json["files"][0]["filename"]
         with open(f"{target_dir / file_name}", 'wb') as file:
-            file.write(requests.get(download_url).content)
+            file.write(requests.get(download_url, timeout=30).content)
             logger.info(f"{file_name} 下载完成!")
         with open(f"{target_dir}dl.txt", "a") as f: f.write(f"{old_file_name}\n")
         return True

@@ -5,7 +5,7 @@ from PySide6 import QtWidgets, QtCore
 import os, shutil, json, logging
 
 from terminal.func import version, mod, config, utils
-from message import Message, Dialog
+from message import Message, Dialog, DisplayMessageable
 import MCException
 
 logging.basicConfig(level=logging.INFO)
@@ -107,12 +107,21 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
             self.task_migrate.deleteLater()
             self.task_migrate = None
             self.message_requested.emit(f"{source_json.get('name')}已迁移至{target_json.get('name')}！", Message.Level.DONE)
-        self.task_migrate = Terminal.TaskMigrate(self, source_dir, target_dir, source_json, target_json)
+        self.task_migrate = Terminal.TaskMigrateAbortable(self, source_dir, target_dir, source_json, target_json)
         self.task_migrate.finished.connect(finish)
         self.task_migrate.moveToThread(self.thread_migrate)
         self.thread_migrate.started.connect(self.task_migrate.do_work)
         self.thread_migrate.start()
-
+    
+    def terminate_migrate_task(self):
+        if self.task_migrate:
+            self.task_migrate.abort()
+        def cleanup():
+            logging.info('已终止迁移任务')
+            self.thread_migrate.quit()
+            self.task_migrate.deleteLater()
+            self.task_migrate = None
+        self.task_migrate.terminated.connect(cleanup)
             
     def add_version(self, path: Path) -> list[dict] | None:
         return version.add_version(path)
@@ -152,8 +161,9 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
             module = importlib.import_module(module_path)
             return getattr(module, class_name)
         
-    class TaskMigrate(QtCore.QObject):
+    class TaskMigrateAbortable(QtCore.QObject):
         finished = QtCore.Signal()
+        terminated = QtCore.Signal()
         update_migrate_general = QtCore.Signal(int)
         update_migrate_detail = QtCore.Signal(int, int)
         def __init__(self, terminal: 'Terminal', source_dir: Path, target_dir: Path, source_json: dict, target_json: dict):
@@ -166,6 +176,7 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
 
             # 状态
             self.is_calculating = True
+            self._abort = False
 
             # 任务总数
             self.pending_num = 0
@@ -192,10 +203,18 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
             ]
             if config.get_config_value('migrate', 'filter_rule') == 'excludes':
                 self.exclude_files.extend(config.get_config_value('migrate', 'excludes'))
+
+        def abort(self):
+            '''终止任务'''
+            self._abort = True
             
         @QtCore.Slot()
         def do_work(self):
             # 计算待处理任务数量（复制文件）
+            if self._abort:
+                logging.info('任务被终止（计算任务数阶段）')
+                self.terminated.emit()
+                return
             self.pending_num_file = len([dir for dir in os.listdir(self.source_dir) if dir not in self.exclude_files])
             self.pending_num += self.pending_num_file
             self.pending_num_total = self.pending_num
@@ -210,7 +229,10 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
                 self.pending_num += self.pending_num_mod
                 self.pending_num_total = self.pending_num
                 self.pending_num_mod_total = self.pending_num_mod
-
+            if self._abort:
+                logging.info('任务被终止（计算任务数阶段）')
+                self.terminated.emit()
+                return
             # 算完任务数量了，接下来就来干正事吧（
             self.is_calculating = False
             
@@ -220,23 +242,33 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
                 if not config.get_config_value('migrate', 'keep-original-mods'):
                     utils.clear_folder(self.target_dir / 'mods')
                 self.download_mods(self.source_dir / "mods", self.target_dir / "mods", self.target_json["version"], self.target_json["mod_loader"], mod_list)
-                logging.info("mod下载完成")
-            
+                if self._abort:
+                    logging.info('任务被终止（模组下载阶段）')
+                    self.terminated.emit()
+                    return
+                logging.info("mod下载完成") 
+                
             # 开始迁移文件
             logging.info("迁移游戏文件")
             self.migrate_file(self.source_dir, self.target_dir)
+            if self._abort:
+                logging.info('任务被终止（文件迁移阶段）')
+                self.terminated.emit()
+                return
             logging.info("游戏文件迁移完成")
             self.report_exception()
             self.finished.emit()
 
         def migrate_file(self, source_dir: Path, target_dir: Path):
             for item in Path(source_dir).iterdir():
+                if self._abort:
+                    return
                 if item.name.startswith('.') or item.name.startswith('$'): continue # 跳过隐藏文件
                 if item.name not in self.exclude_files: # 根据config.yml中的过滤规则来筛去文件
                     logging.info(f"复制{item}至{target_dir / item.name}")
                     try:
                         if item.is_dir(): # 文件夹（覆盖）
-                            shutil.copytree(item, target_dir / item.name, dirs_exist_ok=True)
+                            self.copy_tree_with_abort(item, target_dir / item.name, exist_ok=True)
                         else: # 文件
                             shutil.copy(item, target_dir / item.name)
                     except PermissionError as e:
@@ -258,6 +290,8 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
             self.failed_mods_not_adapt: List[str] = []
 
             for old_file_name in file_name_list:
+                if self._abort:
+                    return
                 logging.info(f"\n{old_file_name}")
                 
                 # 检测是否已下载，有则跳过
@@ -267,7 +301,7 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
                     continue
 
                 elif not mod.modrinth(target_ver, mod_loader, source_dir, old_file_name, target_dir, self.failed_mods_not_adapt):
-                        list.append(self.failed_mods_not_adapt, old_file_name)
+                    self.failed_mods_not_adapt.append(old_file_name)
 
                 self.reduce_pending_num_mod()
 
@@ -324,3 +358,21 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
         def reduce_pending_num_file(self):
             self.pending_num_file -= 1
             self.reduce_pending_num()
+
+        def copy_tree_with_abort(self, src: Path, dst: Path, exist_ok=True):
+            """递归复制目录，支持中途终止"""
+            if self._abort:
+                return
+
+            dst.mkdir(parents=True, exist_ok=exist_ok)
+            
+            for item in src.iterdir():
+                if self._abort:
+                    return
+                if item.is_dir():
+                    self.copy_tree_with_abort(item, dst / item.name)
+                else:
+                    try:
+                        shutil.copy2(item, dst / item.name)
+                    except Exception as e:
+                        self.failed_files_copy.append([str(item), str(e)])

@@ -2,13 +2,14 @@ from enum import Enum
 from PySide6 import QtWidgets, QtGui, QtCore
 from terminal.Terminal import Terminal
 
+from message import Dialog, Message
 from windows.loadStyleSheet import load_stylesheet
 from windows.SendMessageable import SendMessageable
 from terminal.func.utils import resource_path
 import Geometry, GeometryIcon
 
 class MigrateDetail(SendMessageable):
-    def __init__(self, terminal: Terminal, migrate_task: Terminal.TaskMigrate, pre_window: QtWidgets.QFrame):
+    def __init__(self, terminal: Terminal, migrate_task: Terminal.TaskMigrateAbortable, pre_window: QtWidgets.QFrame):
         super().__init__(terminal.main_window)
         self.pre_window = pre_window
         self.terminal = terminal
@@ -41,8 +42,12 @@ class MigrateDetail(SendMessageable):
 
         # 退出按钮
         self.button_back = MigrateDetail.ButtonBack(self)
-        self.button_back.move(15, 15)
-        self.raise_()
+        self.button_back.move(20, 15)
+        self.button_back.raise_()
+        # 终止任务按键
+        self.button_terminate = MigrateDetail.ButtonTerminate(self)
+        self.button_terminate.move(20, 50)
+        self.button_terminate.raise_()
 
         # 模组方面
         self.task_list.add_task('mod', '下载更新模组', MigrateDetail.TaskStatus.IN_PROGRESS)
@@ -71,6 +76,11 @@ class MigrateDetail(SendMessageable):
             if self.migrate_task.pending_num_file > 0:
                 self.task_list.update_task('file', percent=1-self.migrate_task.pending_num_file/self.migrate_task.pending_num_file_total, task_status=MigrateDetail.TaskStatus.IN_PROGRESS)
             else: self.task_list.update_task('file', task_status=MigrateDetail.TaskStatus.COMPLETED)
+
+    @QtCore.Slot()
+    def terminate(self):
+        self.dialog.current_dialog.close_with_animation()
+        self.terminal.switch_window_with_msg(Terminal.WindowEnum.MIGRATE, ('已终止迁移任务', Message.Level.INFO), self.terminal.versions_json)
 
     @QtCore.Slot()
     def back(self):
@@ -218,3 +228,26 @@ class MigrateDetail(SendMessageable):
             self.setLayout(QtWidgets.QHBoxLayout())
             self.layout().addWidget(Geometry.Arrow(self, self, color="#79D2B1", angle=-180))
             self.clicked.connect(parent.back)
+
+    class ButtonTerminate(QtWidgets.QPushButton):
+        def __init__(self, parent: 'MigrateDetail'):
+            super().__init__(parent=parent)
+            self.setFixedSize(46,46)
+            self.setObjectName('buttonTerminate')
+            self.setStyleSheet(load_stylesheet(resource_path('qss/migrate_detail.qss')))
+            self.setLayout(QtWidgets.QHBoxLayout())
+            self.layout().addWidget(GeometryIcon.Terminate('#aaaaaa', parent=self))
+
+            def wait_for_terminated():
+                parent.terminal.terminate_migrate_task()
+                current_dialog = parent.dialog.current_dialog
+                # 失效终止按钮，防止重复发送请求
+                current_dialog.dialog_buttons[0].clicked.disconnect()
+                current_dialog.content_text.setText(current_dialog.content_text.text() + "\n\n等待任务结束中...")
+
+            self.clicked.connect(lambda: parent.dialog.warning(
+                '确定要终止迁移任务吗？',
+                '已经迁移完成的文件将不会删除，若有需要请自行删除',
+                ('终止任务!', Dialog.Level.ERROR, wait_for_terminated)
+            ))
+            parent.terminal.task_migrate.terminated.connect(parent.terminate)

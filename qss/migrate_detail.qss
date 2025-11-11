@@ -40,11 +40,20 @@
     border-radius: 6px;
     background-color: transparent
 }
-
 #buttonBack:hover {
     background-color: rgba(0, 0, 0, 10)
 }
-
 #buttonBack:pressed {
+    background-color: rgba(0, 0, 0, 30)
+}
+
+#buttonTerminate {
+    border-radius: 26px;
+    background-color: '#dad099'
+}
+#buttonTerminate:hover {
+    background-color: rgba(0, 0, 0, 10)
+}
+#buttonTerminate:pressed {
     background-color: rgba(0, 0, 0, 30)
 }

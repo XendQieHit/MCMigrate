@@ -10,7 +10,7 @@ from terminal.func.utils import resource_path
 import Geometry, MCException
 
 class Migrate(SendMessageable):
-    def __init__(self, terminal: Terminal, version_paths: list[dict], migrate_task: Terminal.TaskMigrate=None):
+    def __init__(self, terminal: Terminal, version_paths: list[dict], migrate_task: Terminal.TaskMigrateAbortable=None):
         super().__init__(terminal.main_window)
         self.versions = version_paths
         self.terminal = terminal
@@ -433,7 +433,7 @@ class ButtonMigrateDetail(QtWidgets.QPushButton):
         self.shadow.setStyleSheet("background-color: '#5f9772'; border-radius: 35px")
         self.move(self.parentWidget().width() - self._size - 20, self.parentWidget().height() - self._size - 20)
     
-    def set_migrate_task(self, migrate_task: Terminal.TaskMigrate):
+    def set_migrate_task(self, migrate_task: Terminal.TaskMigrateAbortable):
         # 点击后转至MigrateDetail界面
         self.clicked.connect(lambda: self.terminal.switch_window(Terminal.WindowEnum.MIGRATE_DETAIL, migrate_task, self.parent()))
     
