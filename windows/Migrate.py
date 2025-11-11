@@ -45,14 +45,6 @@ class Migrate(SendMessageable):
         ))
         self.github_url.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
         self.top_bar.layout().addWidget(self.github_url, 0)
-        # 炸弹💣！BOOM！
-        self.crash_btn = QtWidgets.QPushButton()
-        self.crash_btn.setText("💣")
-        self.crash_btn.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
-        def cr():
-            raise RuntimeError("哎呀~被抓到了~^w^")
-        self.crash_btn.clicked.connect(cr)
-        self.top_bar.layout().addWidget(self.crash_btn, 0)
         
         # 版本列表
         self.list_box = QtWidgets.QHBoxLayout()
