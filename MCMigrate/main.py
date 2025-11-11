@@ -12,7 +12,7 @@ from message.DisplayMessageable import DisplayMessageable
 # 配置日志文件夹
 BASE_DIR = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
 LOG_DIR = os.path.join(BASE_DIR, 'logs')
-LOG_FILE = os.path.join(LOG_DIR, f'{time.strftime('%Y-%m-%d')}.log')
+LOG_FILE = os.path.join(LOG_DIR, f"{time.strftime('%Y-%m-%d')}.log")
 os.makedirs(LOG_DIR, exist_ok=True)
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
