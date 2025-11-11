@@ -1,0 +1,92 @@
+# .github/workflows/build.yml
+name: Build MCMigrate
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          cd ../../
+          pip install pyinstaller -r requirements.txt
+
+      - name: Build with PyInstaller
+        run: |
+          cd ../../
+          build.bat
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MCMigrate-windows
+          path: ../../dist/MCMigrate.exe
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          cd ../../
+          python -m pip install --upgrade pip
+          pip install pyinstaller -r requirements.txt
+
+      - name: Build with PyInstaller
+        run: build.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MCMigrate-macos
+          path: ../../dist/MCMigrate
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install system dependencies (for GUI apps)
+        run: sudo apt-get update && sudo apt-get install -y libxcb-cursor0
+
+      - name: Install dependencies
+        run: |
+          cd ../../
+          python -m pip install --upgrade pip
+          pip install pyinstaller -r requirements.txt
+
+      - name: Build with PyInstaller
+        run: |
+          cd ../../
+          build.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MCMigrate-linux
+          path: ../../dist/MCMigrate
