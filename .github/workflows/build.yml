@@ -22,7 +22,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyinstaller -r requirements.txt
+          pip install pyinstaller
+          pip install -r requirements.txt
 
       - name: Build with PyInstaller
         run: build.bat
@@ -46,10 +47,14 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyinstaller -r requirements.txt
+          pip install pyinstaller
+          pip install -r requirements.txt
+
+      - name: Make shell script executable
+        run: chmod +x build.sh
 
       - name: Build with PyInstaller
-        run: build.sh
+        run: ./build.sh
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -73,10 +78,14 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyinstaller -r requirements.txt
+          pip install pyinstaller
+          pip install -r requirements.txt
+
+      - name: Make shell script executable
+        run: chmod +x build.sh
 
       - name: Build with PyInstaller
-        run: build.sh
+        run: ./build.sh
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
