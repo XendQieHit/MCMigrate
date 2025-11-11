@@ -46,7 +46,7 @@ class MigrateDetail(SendMessageable):
         self.button_back.raise_()
         # 终止任务按键
         self.button_terminate = MigrateDetail.ButtonTerminate(self)
-        self.button_terminate.move(20, 50)
+        self.button_terminate.move(20, self.terminal.main_window.height()-self.button_terminate.height()-30)
         self.button_terminate.raise_()
 
         # 模组方面
@@ -223,6 +223,7 @@ class MigrateDetail(SendMessageable):
         def __init__(self, parent: 'MigrateDetail'):
             super().__init__(parent=parent)
             self.setFixedSize(45, 45)
+            self.setToolTip("回到上一界面")
             self.setObjectName('buttonBack')
             self.setStyleSheet(load_stylesheet(resource_path('qss/migrate_detail.qss')))
             self.setLayout(QtWidgets.QHBoxLayout())
@@ -232,11 +233,13 @@ class MigrateDetail(SendMessageable):
     class ButtonTerminate(QtWidgets.QPushButton):
         def __init__(self, parent: 'MigrateDetail'):
             super().__init__(parent=parent)
-            self.setFixedSize(46,46)
+            self.setFixedSize(50,50)
+            self.setToolTip("终止任务")
             self.setObjectName('buttonTerminate')
             self.setStyleSheet(load_stylesheet(resource_path('qss/migrate_detail.qss')))
             self.setLayout(QtWidgets.QHBoxLayout())
-            self.layout().addWidget(GeometryIcon.Terminate('#aaaaaa', parent=self))
+            self.layout().setContentsMargins(0,0,0,0)
+            self.layout().addWidget(GeometryIcon.Terminate("#79D2B1", size=36), 0, QtCore.Qt.AlignmentFlag.AlignCenter)
 
             def wait_for_terminated():
                 parent.terminal.terminate_migrate_task()

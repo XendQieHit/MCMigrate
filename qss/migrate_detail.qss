@@ -48,8 +48,9 @@
 }
 
 #buttonTerminate {
-    border-radius: 26px;
-    background-color: '#dad099'
+    border: 3px solid "#79D2B1";
+    border-radius: 25px;
+    background-color: transparent
 }
 #buttonTerminate:hover {
     background-color: rgba(0, 0, 0, 10)
