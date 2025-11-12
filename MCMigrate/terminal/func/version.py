@@ -4,27 +4,36 @@ import json, re, zipfile, os
 import logging, MCException
 
 from message import Message, Dialog
+dialog = Dialog.Dialogable()
 
 # 设置日志
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-message = Message.Messageable(logger)
-dialog = Dialog.Dialogable()
 
 
-def add_version(path: Path) -> list[dict] | None:
+def add_version(path: Path) -> list[dict] | list[list[dict], list[dict], list[str]] | None:
+    '''
+    解析并获取版本信息
+        返回对象为list[dict]，则说明无异常，可直接使用
+        返回对象为None, 说明解析失败或未找到
+        返回对象为list[list[dict], list[dict], list[dict]]，则发现无法判断是否版本隔离的版本，
+        list[0]是已判断成功的版本信息，
+        list[1]是无法判断成功的版本信息，其中，每个版本各有一份隔离和非隔离的版本信息，需要用户判断是否为版本隔离来决定剔除。
+        list[2]是解析失败的版本
+    '''
     # 检测是否是游戏文件夹
     if path.name == ".minecraft" or (path / "versions").is_dir():
         logger.info("找到游戏文件夹，正在解析导入游戏版本...")
         versions = parse_path(path)
-        update_versions_json(versions)
+
+        if versions.isinstance(list): # 全部解析成功的情况，自动更新versions.json文件
+            update_versions_json(versions)
         return versions
     raise MCException.NotMCGameFolder()
     
 def update_versions_json(versions: list[dict]):
     if not versions:
         return
-
     try:
         with open('versions.json', 'r', encoding='utf-8') as f:
             content = json.load(f)
@@ -50,7 +59,10 @@ def update_versions_json(versions: list[dict]):
 
 def parse_path(path: Path) -> list[dict]:
     versions = []
+    done_versions = []
+    query_versions = []
     failed_versions = []
+
     path_versions = Path(path / 'versions')
     if path_versions.exists():
         logger.info("找到versions文件夹，开始逐个解析版本")
@@ -81,28 +93,27 @@ def parse_path(path: Path) -> list[dict]:
                 # 好吧其实应该待其他确定版本导入完成后，再去向用户询问是否有版本隔离
                 # 但是现在还是先专注与功能实现吧...
                 if not is_confirmed:
-                    versions.append(parse_version(p, True))
-                    versions.append(parse_version(p, False))
+                    query_versions.append(parse_version(p, True))
+                    query_versions.append(parse_version(p, False))
     else: 
         raise MCException.VersionsFolderNotFound()
 
     # 汇总一下哪些版本导入失败
-    filtered_versions = []
+    done_versions = []
     for item in versions:
         if item:
-            filtered_versions.append(item)
+            done_versions.append(item)
         else:
-            logger.error(f"导入{item}失败")
             failed_versions.append(item)
+
+    # 汇总结果
+    has_exception = False
     if failed_versions != []:
-        dialog.send_dialog(
-            "以下版本无法导入", 
-            Dialog.Level.WARNING, 
-            '\n'.join([item for item in failed_versions]), 
-            None
-        )
-    
-    return filtered_versions
+        logger.error(f"以下版本解析失败：{[v + "\n" for v in failed_versions]}")
+    if query_versions != []:
+        logger.warning(f"无法确定以下版本的隔离设置：{[v + "\n" for v in query_versions]}")
+    if has_exception: return [done_versions, query_versions, failed_versions]
+    return done_versions
 
 def is_indie_pcl(pcl_folder) -> bool:
     with open(pcl_folder / 'Setup.ini', 'r', encoding='utf-8') as ini_file:

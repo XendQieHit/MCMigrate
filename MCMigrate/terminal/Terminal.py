@@ -33,7 +33,17 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
         if version_path == Path("."): return None # 传空值就忽略，什么消息也不发
         # 开始解析版本路径
         try:
-            self.add_version(version_path)
+            versions = self.add_version(version_path)
+            if versions.isinstance[list[list, list, list]]: # 需手动判断
+                if versions[1] != []: # 出现无法判断版本隔离的情况，让用户判断
+                    for ver in versions[1][::2]:
+                        ver: dict
+                        self.send_dialog(
+                            '出现无法确定版本隔离的情况',
+                            Dialog.Level.WARNING,
+                            f"版本名称：{ver['name']}\n版本号：{ver['version']}\n版本路径：{ver['game_path']}\n模组加载器：{ver['mod_loader']}\n\n该版本是否启用版本隔离？",
+                            ()
+                        )
         except MCException.NotMCGameFolder as e:
             self.send_message(f"{e}", Message.Level.ERROR)
             return None

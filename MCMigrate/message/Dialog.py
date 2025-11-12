@@ -22,6 +22,7 @@ class DialogWindow(QtWidgets.QWidget):
     '''
     直接浮现在窗口中心的问答框
     '''
+    closed = QtCore.Signal()
     def __init__(
         self,
         title: str,
@@ -33,7 +34,8 @@ class DialogWindow(QtWidgets.QWidget):
     ):
         super().__init__(parent=parent_widget)
         self.parent_widget = parent_widget
-        
+        self.can_not_be_covered = False
+
         # 设置窗口支持透明
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
         
@@ -94,13 +96,17 @@ class DialogWindow(QtWidgets.QWidget):
         # 取消按钮
         self.button_cancel = DialogWindow.DialogButton('取消', Level.INFO, self.close_with_animation)
         self.button_section.layout().addWidget(self.button_cancel)
-        if text:= kwargs.get('change_cancel_btn_text', False):
-            self.button_cancel.setText(text)
 
         # 根据kwargs进行其他额外参数调整
+        # 取消按钮的文字
+        if text:= kwargs.get('change_cancel_btn_text', False):
+            self.button_cancel.setText(text)
+        # 点击任意按钮同时关闭问答框
         if kwargs.get('close_when_clicked_any_btn', False):
             for btn in self.dialog_buttons:
                 btn.clicked.connect(self.close_with_animation)
+        # 不可被新的问答框顶掉
+        self.can_not_be_covered = kwargs.get('can_not_be_covered', False)
 
         # 准备动画展示，先隐藏界面
         self.effect_opacity = QtWidgets.QGraphicsOpacityEffect(opacity=0.0)
@@ -126,6 +132,7 @@ class DialogWindow(QtWidgets.QWidget):
         self.anim_fade_in.start()
     
     def close_with_animation(self):
+        
         self.anim_fade_in = QtCore.QPropertyAnimation(self.graphicsEffect(), b"opacity")
         self.anim_fade_in.setDuration(100)
         self.anim_fade_in.setStartValue(self.graphicsEffect().opacity())
@@ -133,6 +140,10 @@ class DialogWindow(QtWidgets.QWidget):
         self.anim_fade_in.setEasingCurve(QtCore.QEasingCurve.InOutQuad)
         self.anim_fade_in.finished.connect(self.close)
         self.anim_fade_in.start()
+    
+    def close(self):
+        self.closed.emit()
+        return super().close()
     
     class DialogButton(QtWidgets.QPushButton):
         def __init__(self, text: str, level: Level, func: Callable[[], None]):
@@ -162,6 +173,7 @@ class Dialog:
     def __init__(self, parent_widget=None):
         self.parent_widget = parent_widget
         self.current_dialog: DialogWindow = None
+        self.pending_dialog_requests: list[tuple[str, Level, str, QtWidgets.QWidget, tuple, dict]] = []
 
     def show_dialog(self, title: str, level: Level, content_text: str, *buttons, **kwargs):
         '''
@@ -171,14 +183,37 @@ class Dialog:
             button(tuple[str, Dialog.Level, Callable[[], None]]): 按钮 
             change_cancel_btn_text(str): 改变关闭问答框按钮的文字
             close_when_clicked_any_btn(bool): 点击任意按钮就关闭问答框
+            can_not_be_cover(bool): 不可被新生成的问答框顶掉，新的问答框会在该问答框关闭后弹出
         '''
         if self.current_dialog:
-            self.current_dialog.close()
-            self.current_dialog.deleteLater()
-            self.current_dialog = None
+            if self.current_dialog.can_not_be_covered: # 如果正在展示的问答框无法被覆盖，将该请求移至等待队列pending_dialog_requests
+
+                if self.pending_dialog_requests == []: # 首次添加等待请求，连接更新信号
+                    self.current_dialog.closed.connect(self.update_dialog)
+
+                new_dialog_args: tuple = (title, level, content_text, self.parent_widget, buttons, kwargs)
+                self.pending_dialog_requests.append(new_dialog_args)
+                return
+            
+            # 顶掉正在展示的问答框
+            self.close_and_del_current_dialog()
+        
         self.current_dialog = DialogWindow(title, level, content_text, self.parent_widget, *buttons, **kwargs)
         self.current_dialog.show_with_animation()
         return self.current_dialog
+
+    def close_and_del_current_dialog(self):
+        self.current_dialog.close()
+        self.current_dialog.deleteLater()
+        self.current_dialog = None
+    
+    def update_dialog(self):
+        current_dialog_tuple = self.pending_dialog_requests.pop(0)
+        self.current_dialog = DialogWindow(current_dialog_tuple[0], current_dialog_tuple[1], current_dialog_tuple[2], current_dialog_tuple[3], *current_dialog_tuple[4], **current_dialog_tuple[5])
+        self.current_dialog.show_with_animation()
+        # 根据 正在展示窗口的属性 和 是否存在后续请求 来连接更新函数
+        if self.current_dialog.can_not_be_covered and self.pending_dialog_requests != []: 
+            self.current_dialog.closed.connect(self.update_dialog)
 
     def info(self, title: str, content_text: str, *buttons, **kwargs):
         '''
@@ -188,6 +223,7 @@ class Dialog:
             button(tuple[str, Dialog.Level, Callable[[], None]]): 按钮 
             change_cancel_btn_text(str): 改变关闭问答框按钮的文字
             close_when_clicked_any_btn(bool): 点击任意按钮就关闭问答框
+            can_not_be_covered(bool): 不可被新生成的问答框顶掉，新的问答框会在该问答框关闭后弹出
         '''
         return self.show_dialog(title, Level.INFO, content_text, *buttons, **kwargs)
 
@@ -199,6 +235,7 @@ class Dialog:
             button(tuple[str, Dialog.Level, Callable[[], None]]): 按钮 
             change_cancel_btn_text(str): 改变关闭问答框按钮的文字
             close_when_clicked_any_btn(bool): 点击任意按钮就关闭问答框
+            can_not_be_covered(bool): 不可被新生成的问答框顶掉，新的问答框会在该问答框关闭后弹出
         '''
         return self.show_dialog(title, Level.WARNING, content_text, *buttons, **kwargs)
 
@@ -210,6 +247,7 @@ class Dialog:
             button(tuple[str, Dialog.Level, Callable[[], None]]): 按钮 
             change_cancel_btn_text(str): 改变关闭问答框按钮的文字
             close_when_clicked_any_btn(bool): 点击任意按钮就关闭问答框
+            can_not_be_covered(bool): 不可被新生成的问答框顶掉，新的问答框会在该问答框关闭后弹出
         '''
         return self.show_dialog(title, Level.ERROR, content_text, *buttons, **kwargs)
 
@@ -221,6 +259,7 @@ class Dialog:
             button(tuple[str, Dialog.Level, Callable[[], None]]): 按钮 
             change_cancel_btn_text(str): 改变关闭问答框按钮的文字
             close_when_clicked_any_btn(bool): 点击任意按钮就关闭问答框
+            can_not_be_covered(bool): 不可被新生成的问答框顶掉，新的问答框会在该问答框关闭后弹出
         '''
         return self.show_dialog(title, Level.DONE, content_text, *buttons, **kwargs)
     
