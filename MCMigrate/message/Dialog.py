@@ -1,9 +1,12 @@
 from PySide6 import QtWidgets, QtCore, QtGui
 from typing import Callable, Dict
 from enum import Enum
+from dataclasses import dataclass
 import sys, logging
 from windows.loadStyleSheet import load_stylesheet
-from terminal.func.utils import resource_path, hex_rgba_to_tuple
+from utils.func import resource_path, hex_rgba_to_tuple
+from utils.TreeNode import TreeNode
+from DisplayMessageable import DisplayMessageable
 
 class Level(Enum):
     INFO = (1, "#5cb7ef", "#34566c5f", "#7bccff2b", "#ffffff")
@@ -87,15 +90,14 @@ class DialogWindow(QtWidgets.QWidget):
         self.dialog_window.layout().addWidget(self.button_section, 0)
         # 添加按钮
         if buttons:
-            for button in buttons:
-                if button:
-                    btn = DialogWindow.DialogButton(button[0], button[1], button[2])
-                    self.button_section.layout().addWidget(btn)
-                    self.dialog_buttons.append(btn)
+            for button_tuple in buttons:
+                if button_tuple:
+                    self.add_button(button_tuple[0], button_tuple[1], button_tuple[2])
         
-        # 取消按钮
-        self.button_cancel = DialogWindow.DialogButton('取消', Level.INFO, self.close_with_animation)
-        self.button_section.layout().addWidget(self.button_cancel)
+        # 添加取消按钮
+        if kwargs.get('add_button_cancel', True):            
+            self.button_cancel = DialogWindow.DialogButton('取消', Level.INFO, self.close_with_animation)
+            self.button_section.layout().addWidget(self.button_cancel)
 
         # 根据kwargs进行其他额外参数调整
         # 取消按钮的文字
@@ -112,6 +114,12 @@ class DialogWindow(QtWidgets.QWidget):
         self.effect_opacity = QtWidgets.QGraphicsOpacityEffect(opacity=0.0)
         self.setGraphicsEffect(self.effect_opacity)
 
+    def add_button(self, text: str, level: Level, func: Callable[[], None]):
+        btn = DialogWindow.DialogButton(text, level, func)
+        self.button_section.layout().addWidget(btn)
+        self.dialog_buttons.append(btn)
+        return btn
+
     def show_with_animation(self):
         self.show()
         self.raise_()
@@ -123,32 +131,33 @@ class DialogWindow(QtWidgets.QWidget):
         self.dialog_window.show()
 
         # 透明度动画
-        self.anim_fade_in = QtCore.QPropertyAnimation(self.graphicsEffect(), b"opacity")
-        self.anim_fade_in.setDuration(300)
-        self.anim_fade_in.setStartValue(0.0)
-        self.anim_fade_in.setEndValue(1.0)
-        self.anim_fade_in.setEasingCurve(QtCore.QEasingCurve.InOutQuad)
+        self.anim = QtCore.QPropertyAnimation(self.graphicsEffect(), b"opacity")
+        self.anim.setDuration(300)
+        self.anim.setStartValue(0.0)
+        self.anim.setEndValue(1.0)
+        self.anim.setEasingCurve(QtCore.QEasingCurve.InOutQuad)
 
-        self.anim_fade_in.start()
+        self.anim.start()
     
     def close_with_animation(self):
         
-        self.anim_fade_in = QtCore.QPropertyAnimation(self.graphicsEffect(), b"opacity")
-        self.anim_fade_in.setDuration(100)
-        self.anim_fade_in.setStartValue(self.graphicsEffect().opacity())
-        self.anim_fade_in.setEndValue(0.0)
-        self.anim_fade_in.setEasingCurve(QtCore.QEasingCurve.InOutQuad)
-        self.anim_fade_in.finished.connect(self.close)
-        self.anim_fade_in.start()
+        self.anim = QtCore.QPropertyAnimation(self.graphicsEffect(), b"opacity")
+        self.anim.setDuration(100)
+        self.anim.setStartValue(self.graphicsEffect().opacity())
+        self.anim.setEndValue(0.0)
+        self.anim.setEasingCurve(QtCore.QEasingCurve.InOutQuad)
+        self.anim.finished.connect(self.close)
+        self.anim.start()
     
     def close(self):
         self.closed.emit()
         return super().close()
     
     class DialogButton(QtWidgets.QPushButton):
-        def __init__(self, text: str, level: Level, func: Callable[[], None]):
+        def __init__(self, text: str, level: Level, func: Callable[[], None]=None, **kwargs):
             super().__init__(text)
             self.color_bg = hex_rgba_to_tuple(level.color_btn)
+            self.hover_text_widget = None
             self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
             self.setStyleSheet(f"""
                 QPushButton {{
@@ -163,10 +172,156 @@ class DialogWindow(QtWidgets.QWidget):
                     background-color: rgba{self.color_bg}
                 }}
             """)
-            self.clicked.connect(func)
+            if func: self.clicked.connect(func)
+
+            # 根据kwargs进行功能上的调整
+            # 悬浮时弹出的文本
+            if hover_text:= kwargs.get('hover_text', False):
+                self.hover_text_widget = QtWidgets.QLabel(hover_text)
+        
+        def enterEvent(self, event):
+            super().enterEvent(event)
+            self.hover_text_widget
+
+class DialogSeries(QtCore.QObject):
+    '''
+    用于需要一连串问询用户的问答框组
+    \n注意！为了知晓问答结束以及获取问答结果的数据，需要手动将finished信号连接到处理数据的函数方法！
+    '''
+    finished = QtCore.Signal(Dict)
+    def __init__(self, beg_dialog_tree: 'DialogTreeNode', parent_widget: QtWidgets.QWidget, process_data: Dict={}):
+        super().__init__()
+        self.parent_widget = parent_widget
+        self.current_dialog_tree = beg_dialog_tree
+        self.temp_data: Dict = process_data
+
+    def start(self):
+        if not self.current_dialog_tree:
+            raise RuntimeError("DialogTreeNode.dialog 为 None, 先用 create_dialog_series_window 创建一个吧")
+        self.current_dialog_tree.start() # 开始质问！(?
+        self.current_dialog_tree.ended.connect(lambda: self.finished.emit(self.temp_data))
+
+    def set_dialog_tree(self, dialog_tree: 'DialogTreeNode'):
+        try:
+            self.current_dialog_tree.ended.disconnect()
+        except RuntimeError:
+            pass  # 未连接过，忽略
+        self.current_dialog_tree = dialog_tree
+        self.current_dialog_tree.ended.connect(lambda: self.finished.emit(self.temp_data))
+        return self.current_dialog_tree
+
+    def create_dialog_tree(self, name):
+        self.current_dialog_tree = DialogSeries.DialogTreeNode(name=name, dialog_series=self, parent_widget=self.parent_widget)
+        return self.current_dialog_tree
+
+    @dataclass
+    class Action:
+        '''
+        用于标记点击按钮之后的页面操作
+        例：
+        next_action = Action("NEXT", 3) -> 跳转至第二个子节点（以数组索引的形式）
+        end_action = Action("END") -> 结束问答
+        stay_action = Action("STAY") -> 保持窗口（其实除上面两个，其他Action都会被仍为时保持窗口
+        '''
+        type: str  # "NEXT" or "END" 
+        jump_index: int = None
 
 
-class Dialog:
+    class DialogTreeNode(QtCore.QObject):
+        ended = QtCore.Signal()
+
+        def __init__(self, dialog: 'DialogSeries.DialogSeriesWindow'=None, name=None, dialog_series: 'DialogSeries'=None, parent_widget=None):
+            super().__init__()  # 必须先调用 QObject.__init__
+            self.name = name
+            self.dialog = dialog
+            self.dialog_series = dialog_series
+            self.parent_widget = parent_widget # 将会被展示在的地方
+            self.children: list['DialogSeries.DialogTreeNode'] = []  # 自己维护子节点
+
+            if not dialog_series:
+                raise RuntimeError("DialogTreeNode 必须有 dialog_series 参数")
+            if not parent_widget:
+                raise RuntimeError("DialogTreeNode 必须有 parent_widget 参数")
+
+        def create_dialog_series_window(self, title: str, level: Level, content_text: str):
+            self.dialog = DialogSeries.DialogSeriesWindow(title, level, content_text, self.parent_widget, self.dialog_series.temp_data)
+            return self.dialog
+
+        def add_child(self, child: 'DialogSeries.DialogTreeNode'):
+            child.setParent(self)  # 可选：启用 Qt 父子内存管理
+            self.children.append(child)
+            return child
+
+        def add_dialog_node(self, dialog: DialogWindow, name=None) -> 'DialogSeries.DialogTreeNode':
+            new_node = DialogSeries.DialogTreeNode(dialog, name, parent_widget=self.parent_widget)
+            self.add_child(new_node)
+            return new_node
+
+        def when_button_clicked(self, action: 'DialogSeries.Action'):
+            if action.type == "NEXT":
+                self.dialog.closed.connect(self.children[action.jump_index].start) # 下一个就是你了口牙！
+                self.dialog.close_with_animation()
+                
+            elif action.type == "END":
+                self.dialog.close_with_animation()
+                self.ended.emit()
+
+        def start(self):
+            self.dialog.show_with_animation()
+            self.dialog.func_executed.connect(self.when_button_clicked)
+        
+        
+    class DialogSeriesWindow(DialogWindow):
+        func_executed = QtCore.Signal(object) # 其实只能转入Action类，换成object类是因为qt的Signal不支持其他自定义类
+        def __init__(
+            self,
+            title: str,
+            level: Level,
+            content_text: str,
+            parent_widget: QtWidgets.QWidget,
+            temp_data: dict
+        ):
+            super().__init__(title, level, content_text, parent_widget)
+            self.temp_data = temp_data
+            return self
+                
+        def add_button(self, text: str, level: Level, action: 'DialogSeries.Action', func_set_value=None, *keys_in_temp_data, **kwargs):
+            '''
+            添加按钮
+            Args:
+                action(DialogSeries.Action): 当该按钮被点击时，该DialogSeriesWindow会向所属的DialogSeries发出该action
+            '''
+            # 设置按钮点击后修改 temp_data 中对应路径的值
+            def set_value(data, path, val):
+                for key in path[:-1]:
+                    data = data[key]
+                data[path[-1]] = val
+
+            def func():
+                if func_set_value is not None and keys_in_temp_data:
+                    set_value(self.temp_data, keys_in_temp_data, func_set_value)
+            btn = DialogSeries.DialogSeriesButton(text, level, action, func, **kwargs)
+            self.button_section.layout().addWidget(btn)
+            self.dialog_buttons.append(btn)
+            btn.func_executed.connect(self.func_executed)
+            return self
+
+    class DialogSeriesButton(QtWidgets.QPushButton):
+        func_executed = QtCore.Signal(object)
+        def __init__(self, text: str, level: Level, action: 'DialogSeries.Action', func: Callable[[], None]=None, **kwargs):
+            super().__init__(text)
+            self.action = action
+            self.func = func
+
+            # 让func执行完后才发出信号，让后面的进行action判断，防止数据还没更新就跳转了
+            def on_clicked():
+                if self.func:
+                    self.func()
+                self.func_executed.emit(self.action)
+            self.clicked.connect(on_clicked)
+
+
+class Dialog():
     '''
     为前端设计的，能够显示问答框的类
     '''
@@ -214,6 +369,28 @@ class Dialog:
         # 根据 正在展示窗口的属性 和 是否存在后续请求 来连接更新函数
         if self.current_dialog.can_not_be_covered and self.pending_dialog_requests != []: 
             self.current_dialog.closed.connect(self.update_dialog)
+
+    def ask_in_series(self, dialog_series: DialogSeries, finished_func: Callable[[Dict], None]=None):
+        '''
+        开始连续问答
+        Args:
+            finished_func(Callable[[Dict], None): 问答完毕后执行的函数方法，同时向该方法传递问答结果数据dict形参
+        '''
+        dialog_series.start()
+        if finished_func:
+            dialog_series.finished.connect(finished_func)
+
+    def gen_a_series(self, name: str, process_data: dict=None):
+        '''
+        生成一个问答框系列，用于连续问答
+        \n使用该方法生成的series将自动创建DialogTreeNode
+        Args:
+            name(str): 自动创建生成的DialogTreeNode的名字（不过其实也没必要，因为字节点的检索大部分情况下是靠index进行的（倒
+            process_data(dict): 问答过程中被记录处理的数据
+        '''
+        dialog_series = DialogSeries(None, self.parent_widget, process_data)
+        dialog_series.create_dialog_tree(name)
+        return dialog_series
 
     def info(self, title: str, content_text: str, *buttons, **kwargs):
         '''
@@ -268,6 +445,15 @@ class Dialogable(QtCore.QObject):
     dialog_requested = QtCore.Signal(str, object, str, object)  # object 可容纳任何 Python 对象
     
     def send_dialog(self, title: str, level, content_text: str, *buttons, **kwargs):
+        '''
+        弹出问答框
+
+        Args:
+            button(tuple[str, Dialog.Level, Callable[[], None]]): 按钮 
+            change_cancel_btn_text(str): 改变关闭问答框按钮的文字
+            close_when_clicked_any_btn(bool): 点击任意按钮就关闭问答框
+            can_not_be_covered(bool): 不可被新生成的问答框顶掉，新的问答框会在该问答框关闭后弹出
+        '''
         # 打包所有可变数据到一个 dict（或自定义对象）
         payload = {
             'buttons': buttons,  # tuple of tuples

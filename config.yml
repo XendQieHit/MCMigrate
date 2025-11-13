@@ -1,0 +1,13 @@
+migrate:
+  excludes:
+  - assets
+  - data
+  - debug
+  - libraries
+  - logs
+  - NVIDIA
+  - PCL
+  - versions
+  file:
+    copy_option: keep
+  filter_rule: excludes

@@ -7,7 +7,7 @@ from pathlib import Path
 from windows.loadStyleSheet import load_stylesheet
 from windows.SendMessageable import SendMessageable
 from message import Message
-from terminal.func.utils import resource_path
+from utils.func import resource_path
 import MCException
 
 # 欢迎界面

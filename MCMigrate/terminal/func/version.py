@@ -3,15 +3,12 @@ from typing import List
 import json, re, zipfile, os
 import logging, MCException
 
-from message import Message, Dialog
-dialog = Dialog.Dialogable()
-
 # 设置日志
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def add_version(path: Path) -> list[dict] | list[list[dict], list[dict], list[str]] | None:
+def add_version(path: Path) -> list[dict] | list[list[dict], list[dict], list[str]]:
     '''
     解析并获取版本信息
         返回对象为list[dict]，则说明无异常，可直接使用
@@ -20,15 +17,12 @@ def add_version(path: Path) -> list[dict] | list[list[dict], list[dict], list[st
         list[0]是已判断成功的版本信息，
         list[1]是无法判断成功的版本信息，其中，每个版本各有一份隔离和非隔离的版本信息，需要用户判断是否为版本隔离来决定剔除。
         list[2]是解析失败的版本
+    该方法只是获取解析到的版本信息，具体将其同步添加到本地的versions.json，还需要将获取到的值解析并调用update_versions_json(versions)方法
     '''
     # 检测是否是游戏文件夹
     if path.name == ".minecraft" or (path / "versions").is_dir():
         logger.info("找到游戏文件夹，正在解析导入游戏版本...")
-        versions = parse_path(path)
-
-        if versions.isinstance(list): # 全部解析成功的情况，自动更新versions.json文件
-            update_versions_json(versions)
-        return versions
+        return parse_path(path)
     raise MCException.NotMCGameFolder()
     
 def update_versions_json(versions: list[dict]):
@@ -109,14 +103,18 @@ def parse_path(path: Path) -> list[dict]:
     # 汇总结果
     has_exception = False
     if failed_versions != []:
-        logger.error(f"以下版本解析失败：{[v + "\n" for v in failed_versions]}")
+        logger.error(f"以下版本解析失败：\n{'\n'.join(failed_versions)}")
+        has_exception = True
     if query_versions != []:
-        logger.warning(f"无法确定以下版本的隔离设置：{[v + "\n" for v in query_versions]}")
+        logger.warning(f"无法确定以下版本的隔离设置：\n{'\n'.join([query_versions[i]['name'] for i in range(0, len(query_versions), 2)])}")
+        has_exception = True
     if has_exception: return [done_versions, query_versions, failed_versions]
     return done_versions
 
 def is_indie_pcl(pcl_folder) -> bool:
-    with open(pcl_folder / 'Setup.ini', 'r', encoding='utf-8') as ini_file:
+    pcl_ini_file_name = 'Setup.ini'
+    if not Path(pcl_folder / pcl_ini_file_name).exists: pcl_ini_file_name = pcl_ini_file_name.lower() # Linux的大小写敏感可能报错，就加了这个（但是linux能跑pcl吗（？
+    with open(pcl_folder / pcl_ini_file_name, 'r', encoding='utf-8') as ini_file:
         for line in reversed(ini_file.readlines()):
             logger.info(line)
             # 开版本隔离了

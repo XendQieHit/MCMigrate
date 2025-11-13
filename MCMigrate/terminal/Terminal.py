@@ -4,7 +4,8 @@ from pathlib import Path
 from PySide6 import QtWidgets, QtCore
 import os, shutil, json, logging
 
-from terminal.func import version, mod, config, utils
+from MCMigrate.utils import func
+from terminal.func import version, mod, config
 from message import Message, Dialog, DisplayMessageable
 import MCException
 
@@ -34,16 +35,40 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
         # 开始解析版本路径
         try:
             versions = self.add_version(version_path)
-            if versions.isinstance[list[list, list, list]]: # 需手动判断
+            logging.info(versions)
+            if isinstance(versions, list) and len(versions) == 3: # 需手动判断
+                logging.info('hi')
+                
                 if versions[1] != []: # 出现无法判断版本隔离的情况，让用户判断
-                    for ver in versions[1][::2]:
-                        ver: dict
+                    for i in range(0, len(versions[1]), 2):
+                        ver_indie: dict = versions[1][i]
+                        def add_both():
+                            versions[0].append(versions[1][i])
+                            versions[0].append(versions[1][i+1])
+                        
                         self.send_dialog(
                             '出现无法确定版本隔离的情况',
                             Dialog.Level.WARNING,
-                            f"版本名称：{ver['name']}\n版本号：{ver['version']}\n版本路径：{ver['game_path']}\n模组加载器：{ver['mod_loader']}\n\n该版本是否启用版本隔离？",
-                            ()
+                            f"版本名称：{ver_indie['name']}\n版本号：{ver_indie['version']}\n版本路径：{ver_indie['game_path']}\n模组加载器：{ver_indie['mod_loader']}\n\n该版本是否启用版本隔离？",
+                            ('是', Dialog.Level.DONE, lambda: versions[0].append(ver_indie)),
+                            ('否', Dialog.Level.ERROR, lambda: versions[0].append(versions[1][i+1])),
+                            ('不知道啊(将会添加版本隔离和非隔离两份版本)', Dialog.Level.INFO, add_both),
+                            change_cancel_btn_text="跳过该版本",
+                            close_when_clicked_any_btn=True,
+                            can_not_be_covered=True
                         )
+                
+                # 等全部回答完成后，再执行后面的数据同步的步骤
+                def check_is_ended_asks():
+                    logging.info(f"{self.main_window.dialog.pending_dialog_requests}\n{self.main_window.dialog.current_dialog}")
+                    if self.main_window.dialog.is_empty:
+                        self._end_asked(versions)
+                self.main_window.dialog.current_dialog.closed.connect(check_is_ended_asks)
+                
+            else: # 哇哦！居然全解析成功了！直接用这个数据同步到本地并更新前端
+                self.update_versions_json(versions)
+                return self._finish_import_versions()
+
         except MCException.NotMCGameFolder as e:
             self.send_message(f"{e}", Message.Level.ERROR)
             return None
@@ -51,10 +76,22 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
             self.send_message(f"{e}", Message.Level.WARNING)
             return None
         except Exception as e:
+            raise e
             self.send_message(f"导入版本失败：{e}", Message.Level.ERROR)
             return None
+    
+    def _end_asked(self, versions: list[list[dict], list, list[str]]):
+        # 先弹出导入成功的数量信息
+        self.send_message(f'成功导入{len(versions[0])}个版本', Dialog.Level.DONE)
 
+        if versions[2] != []: # 出现无法正常导入的版本，弹窗提示
+            self.send_dialog('有些版本无法导入...', Dialog.Level.ERROR, f'以下版本无法正常导入：\n{'\n'.join(versions[2])}')
+        # 将解析完成的数据添加进本地的versions.json
+        self.update_versions_json(versions[0])
         # 版本路径解析完毕了，接下来就是加载前端版本列表
+        self.switch_window(Terminal.WindowEnum.MIGRATE, self._finish_import_versions())
+
+    def _finish_import_versions(self) -> list[dict]: 
         try:
             if versions:= version.get_versions():
                 self.versions_json = versions
@@ -250,7 +287,7 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
             if mod_list:
                 logging.info("下载mod中")
                 if not config.get_config_value('migrate', 'keep-original-mods'):
-                    utils.clear_folder(self.target_dir / 'mods')
+                    func.clear_folder(self.target_dir / 'mods')
                 self.download_mods(self.source_dir / "mods", self.target_dir / "mods", self.target_json["version"], self.target_json["mod_loader"], mod_list)
                 if self._abort:
                     logging.info('任务被终止（模组下载阶段）')

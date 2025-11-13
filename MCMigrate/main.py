@@ -1,6 +1,7 @@
 from PySide6 import QtCore, QtWidgets, QtGui
+from MCMigrate.utils import func
 from terminal.Terminal import Terminal
-from terminal.func import version, utils
+from terminal.func import version
 from logging.handlers import TimedRotatingFileHandler
 import os, sys, logging, time
 
@@ -50,7 +51,7 @@ class MainWindow(DisplayMessageable, QtWidgets.QMainWindow):
 app = QtWidgets.QApplication([])
 window = MainWindow()
 window.setWindowTitle("MCMigrator")
-window.setWindowIcon(QtGui.QIcon(utils.resource_path("assets/icon_64x64.png")))
+window.setWindowIcon(QtGui.QIcon(func.resource_path("assets/icon_64x64.png")))
 window.resize(800, 400)
 
 # 设置全局异常处理器
@@ -94,8 +95,6 @@ def show_dialog_slot(title: str, level, content_text: str, payload: dict):
         current_widget.dialog.show_dialog(title, level, content_text, *buttons, **kwargs)
 terminal.message_requested.connect(show_message_slot)
 terminal.dialog_requested.connect(show_dialog_slot)
-version.dialog.dialog_requested.connect(show_dialog_slot)
-version.message.message_requested.connect(show_message_slot)
 
 if os.path.exists("versions.json") and os.path.getsize("versions.json") > 0:
         try:

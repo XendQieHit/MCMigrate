@@ -5,7 +5,7 @@ from terminal.Terminal import Terminal
 from message import Dialog, Message
 from windows.loadStyleSheet import load_stylesheet
 from windows.SendMessageable import SendMessageable
-from terminal.func.utils import resource_path
+from utils.func import resource_path
 import Geometry, GeometryIcon
 
 class MigrateDetail(SendMessageable):

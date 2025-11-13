@@ -6,7 +6,7 @@ from pathlib import Path
 from windows.SendMessageable import SendMessageable
 from message import Message, Dialog
 from windows.loadStyleSheet import load_stylesheet
-from terminal.func.utils import resource_path
+from utils.func import resource_path
 import Geometry, MCException
 
 class Migrate(SendMessageable):

@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Any
 import yaml, os, logging
 from message import Message
-from terminal.func.utils import resource_path
+from utils.func import resource_path
 
 # 设置日志
 logger = logging.getLogger(__name__)
