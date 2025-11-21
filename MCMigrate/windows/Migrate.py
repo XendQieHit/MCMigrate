@@ -7,7 +7,8 @@ from windows.SendMessageable import SendMessageable
 from message import Message, Dialog
 from windows.loadStyleSheet import load_stylesheet
 from utils.func import resource_path
-import Geometry, MCException
+from utils.ClientLibs import ColorIconGenerator
+import Geometry, MCException, Animation
 
 class Migrate(SendMessageable):
     def __init__(self, terminal: Terminal, version_paths: list[dict], migrate_task: Terminal.TaskMigrateAbortable=None):
@@ -30,22 +31,35 @@ class Migrate(SendMessageable):
         self.top_bar.setFixedHeight(self.window_title.height())
         self.top_bar.layout().addStretch()
         self.top_bar.layout().setContentsMargins(0,0,0,0)
+        # 清空所有版本按钮
+        self.clear_all_vers_btn = Migrate.TopBarButton(QtGui.QColor("#f05f5a"), QtGui.QColor("#e14d48"), resource_path("assets/delete.svg"), '清除列表里所有的版本', self) # 是的你的ide没有出错，QColor应用在QGraphicsColorizeEffect时，alpha通道值要放前面
+        self.clear_all_vers_btn.clicked.connect(lambda: self.dialog.error(
+            "确定清除所有版本？",
+            "该操作将会清除列表里的所有版本！\n该操作不会对游戏文件本体产生影响。\n\n确定要清除所有版本吗？",
+            (
+                "确定",
+                Dialog.Level.ERROR,
+                self.btn_clear_all_vers_clicked
+            ),
+            close_when_clicked_any_btn=True
+        ))
+        self.top_bar.layout().addWidget(self.clear_all_vers_btn, 0)
         # github链接
-        self.github_url = QtWidgets.QPushButton()
-        self.github_url.setIcon(QtGui.QIcon(resource_path('assets/icon/github.svg')))
+        self.github_url = Migrate.TopBarButton(QtGui.QColor("#202020"), QtGui.QColor("#101010"), resource_path('assets/icon/github.svg'), '前往MCMigrate的Github仓库', self)
         self.github_url.clicked.connect(lambda: self.dialog.info(
             "即将跳转至Github",
             "即将前往MCMigrate的Github仓库。\n如果在使用MCMigrate过程中遇到了Bug，或是其他想要的功能，可以在MCMigrate的Github仓库上的提出Issue来！",
             (
                 "出发！",
                 Dialog.Level.DONE,
-                lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl('https://github.com/XendQieHit/MCMigrate'))
+                lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl('https://github.com/XendQieHit/MCMigrate')),
+                {'hover_text': "前往MCMigrate的Github仓库"}
             ),
             close_when_clicked_any_btn=True
         ))
         self.github_url.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
         self.top_bar.layout().addWidget(self.github_url, 0)
-        
+
         # 版本列表
         self.list_box = QtWidgets.QHBoxLayout()
         self.ver_list_source = Migrate.VersionList(version_paths, self)
@@ -122,12 +136,53 @@ class Migrate(SendMessageable):
         self.button_migrate_detail.set_migrate_task(self.terminal.task_migrate)
         self.terminal.task_migrate.update_migrate_general.connect(self.button_migrate_detail.update_percent)
         self.button_migrate_detail.show_with_animation()
+
+    def btn_clear_all_vers_clicked(self):
+        self.terminal.clear_all_vers()
+        self.message.done("已清除所有版本!")
+        self.terminal.switch_window(Terminal.WindowEnum.WELCOME)
         
     def resizeEvent(self, event):
         super().resizeEvent(event)
         if hasattr(self, 'button_migrate_detail'):
             self.button_migrate_detail.move(self.width() - 100, self.height() - 135)
     
+    class TopBarButton(QtWidgets.QPushButton):
+        def __init__(self, theme_color: QtGui.QColor, clicked_color: QtGui.QColor, icon_path: str | Path, tool_tips: str, parent=None):
+            super().__init__(parent)
+            self.theme_color = theme_color
+            self.clicked_color = clicked_color
+            self.default_color = self.palette().color(QtGui.QPalette.ColorRole.Button)
+            self.icon_size = min(self.height(), self.width())
+            self.icon_gen = ColorIconGenerator(icon_path, theme_color)
+            self.setToolTip(tool_tips)
+            self.setIcon(self.icon_gen.icon(QtCore.QSize(self.icon_size, self.icon_size), self.theme_color))
+            self.setContentsMargins(0,0,0,0)
+            self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
+
+        def enterEvent(self, event):
+            super().enterEvent(event)
+            self.anim_btn = Animation.ChangeColorTransiting(self, QtGui.QColor(self.theme_color), duration=120)
+            self.anim_icon = Animation.ChangeButtonIconColorTransiting(self, self.icon_gen, QtGui.QColor(self.default_color), duration=120)
+            self.anim = QtCore.QParallelAnimationGroup()
+            self.anim.addAnimation(self.anim_btn)
+            self.anim.addAnimation(self.anim_icon)
+            self.anim.start()
+
+        def leaveEvent(self, event):
+            super().leaveEvent(event)
+            self.anim_btn = Animation.ChangeColorTransiting(self, QtGui.QColor(self.default_color), duration=120)
+            self.anim_icon = Animation.ChangeButtonIconColorTransiting(self, self.icon_gen, QtGui.QColor(self.theme_color), duration=120)
+            self.anim = QtCore.QParallelAnimationGroup()
+            self.anim.addAnimation(self.anim_btn)
+            self.anim.addAnimation(self.anim_icon)
+            self.anim.start()
+
+        def mousePressEvent(self, e):
+            super().mousePressEvent(e)
+            palette = self.palette()
+            palette.setColor(QtGui.QPalette.ColorRole.Button, QtGui.QColor(self.clicked_color))
+            self.setPalette(palette)
 
     class VersionItem(QtWidgets.QWidget):
         def __init__(self, json: dict, parent_list: 'Migrate.VersionList'):

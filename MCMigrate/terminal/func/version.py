@@ -231,3 +231,9 @@ def get_versions() -> list[dict]:
     except Exception as e:
         logger.error("读取文件失败")
         raise e
+    
+def clear_all_vers(self):
+    '''清除所有版本信息'''
+    if os.path.exists('versions.json'):
+        os.remove('versions.json')
+    self.versions_json = []

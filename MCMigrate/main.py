@@ -1,5 +1,5 @@
 from PySide6 import QtCore, QtWidgets, QtGui
-from MCMigrate.utils import func
+from utils import func
 from terminal.Terminal import Terminal
 from terminal.func import version
 from logging.handlers import TimedRotatingFileHandler
@@ -53,6 +53,8 @@ window = MainWindow()
 window.setWindowTitle("MCMigrator")
 window.setWindowIcon(QtGui.QIcon(func.resource_path("assets/icon_64x64.png")))
 window.resize(800, 400)
+with open('text.txt', 'w', encoding='utf-8') as f:
+    f.write('hi')
 
 # 设置全局异常处理器
 def handle_exception(exc_type, exc_value, exc_traceback):
@@ -69,7 +71,7 @@ def handle_exception(exc_type, exc_value, exc_traceback):
     try:
         window.dialog.error(
             "不好！",
-            "MCMigrate在运行的时候遇到了不可预测的错误❌\n如果可以的话，麻烦将该日志发在MCMigrate的Github上的Issue里，感谢;w;",
+            "MCMigrate在运行的时候遇到了不可预测的错误！❌\n如果可以的话，麻烦将该日志发在MCMigrate的Github上的Issue里，感谢;w;",
             ("打开日志文件夹", Dialog.Level.INFO, lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl(QtCore.QUrl.fromLocalFile(LOG_DIR)))),
             ("前往反馈", Dialog.Level.INFO, lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl("https://github.com/XendQieHit/MCMigrate")))
         )
@@ -81,21 +83,16 @@ sys.excepthook = handle_exception
 # 初始化 Terminal
 terminal = Terminal(window)
 
-# 连接 Terminal 的信号到窗口的消息和对话框系统
-def show_message_slot(msg: str, level):
-    # 通过窗口的 centralWidget 获取当前页面的消息实例
-    current_widget = window.centralWidget()
-    if hasattr(current_widget, 'message'):
-        current_widget.message.show_message(msg, level)
 def show_dialog_slot(title: str, level, content_text: str, payload: dict):
     buttons = payload['buttons']      # tuple
     kwargs = payload['options']      # dict
-    current_widget = window.centralWidget()
-    if hasattr(current_widget, 'dialog'):
-        current_widget.dialog.show_dialog(title, level, content_text, *buttons, **kwargs)
-terminal.message_requested.connect(show_message_slot)
-terminal.dialog_requested.connect(show_dialog_slot)
+    window.dialog.show_dialog(title, level, content_text, *buttons, **kwargs)
 
+terminal.message_requested.connect(window.message.show_message)
+terminal.dialog_requested.connect(show_dialog_slot)
+terminal.dialog_series_requested.connect(window.dialog.ask_in_series)
+
+# 加载界面
 if os.path.exists("versions.json") and os.path.getsize("versions.json") > 0:
         try:
             if (version_paths:= version.get_versions()) == []: 
