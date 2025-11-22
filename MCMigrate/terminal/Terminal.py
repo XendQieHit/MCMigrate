@@ -61,7 +61,7 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
                         ).add_button(
                             '否', Dialog.Level.ERROR, action, Dialog.DialogSeries.Func(versions[1][i+1], (0, add_suc_versions()))
                         ).add_button(
-                            '不知道啊', Dialog.Level.INFO, action, Dialog.DialogSeries.Func(versions[1][i], (0, add_suc_versions())), Dialog.DialogSeries.Func(versions[1][i], (0, add_suc_versions())), hover_text="将会各添加一个隔离和非隔离的版本"
+                            '不知道啊', Dialog.Level.INFO, action, Dialog.DialogSeries.Func(versions[1][i], (0, add_suc_versions())), Dialog.DialogSeries.Func(versions[1][i+1], (0, add_suc_versions())), hover_text="将会各添加一个隔离和非隔离的版本"
                         ).add_button(
                             '跳过该版本', Dialog.Level.INFO, action
                         )
@@ -190,6 +190,7 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
     
     def clear_all_vers(self):
         version.clear_all_vers(self)
+        self.versions_json = []
     
 
     class WindowEnum(Enum):

@@ -26,12 +26,13 @@ def add_version(path: Path) -> list[dict] | list[list[dict], list[dict], list[st
     raise MCException.NotMCGameFolder()
     
 def update_versions_json(versions: list[dict]):
-    if not versions:
+    print(versions)
+    if not versions: # 过滤None
         return
     try:
         with open('versions.json', 'r', encoding='utf-8') as f:
             content = json.load(f)
-    except (FileNotFoundError, ValueError):
+    except (FileNotFoundError, ValueError): # 解析失败或文件为空
         content = []
 
     # 将字典转为可哈希的 frozenset（或 tuple）去重
@@ -236,4 +237,3 @@ def clear_all_vers(self):
     '''清除所有版本信息'''
     if os.path.exists('versions.json'):
         os.remove('versions.json')
-    self.versions_json = []
