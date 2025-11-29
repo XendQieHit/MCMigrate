@@ -46,6 +46,22 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
         return self.check_import_versions(version.get_versions_from_pcl())
         
     def check_import_versions(self, versions: tuple[dict] | list[list[dict], list[dict], list[dict]]):
+        def _finish_import_versions() -> list[dict]: 
+            try:
+                if versions:= version.get_versions():
+                    self.versions_json = versions
+                    return versions
+                raise IOError("version.json内容为空")
+            except (IOError, OSError) as e:
+                self.send_message(f"读取versions.json失败：{e}", Message.Level.ERROR)
+                return None
+            except json.JSONDecodeError:
+                self.send_message("解析versions.json时失败", Message.Level.ERROR)
+                return None
+            except Exception as e:
+                self.send_message(f"发生了意外的错误：{e}", Message.Level.ERROR)
+                return None
+
         if isinstance(versions, list):
             if versions[1] != []: # 出现无法判断版本隔离的情况，让用户判断
                 series = self.get_query_dialog_series(versions)
@@ -61,18 +77,18 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
                     # 将解析完成的数据添加进本地的versions.json
                     self.update_versions_json(versions[0])
                     # 版本路径解析完毕了，接下来就是加载前端版本列表
-                    self.switch_window(Terminal.WindowEnum.MIGRATE, self._finish_import_versions())
+                    self.switch_window(Terminal.WindowEnum.MIGRATE, _finish_import_versions())
                 # 开始问答！
                 self.ask_in_series(series, _end_asked)
 
             else: # 没有疑问但有无法导入的版本
                 self.send_dialog('有些版本无法导入...', Dialog.Level.ERROR, f'以下版本无法正常导入：\n{'\n'.join(versions[2])}')
                 self.update_versions_json(versions[0])
-                return self._finish_import_versions()
+                return _finish_import_versions()
             
         else: # 哇哦！居然全解析成功了！直接用这个数据同步到本地并更新前端
             self.update_versions_json(versions)
-            return self._finish_import_versions()
+            return _finish_import_versions()
 
     def get_query_dialog_series(self, versions: list[list[dict], list[dict], list[dict]]):
         '''
@@ -112,22 +128,6 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
 
         add_next_dialogs(0, series.create_dialog_tree())
         return series
-
-    def _finish_import_versions(self) -> list[dict]: 
-        try:
-            if versions:= version.get_versions():
-                self.versions_json = versions
-                return versions
-            raise IOError("version.json内容为空")
-        except (IOError, OSError) as e:
-            self.send_message(f"读取versions.json失败：{e}", Message.Level.ERROR)
-            return None
-        except json.JSONDecodeError:
-            self.send_message("解析versions.json时失败", Message.Level.ERROR)
-            return None
-        except Exception as e:
-            self.send_message(f"发生了意外的错误：{e}", Message.Level.ERROR)
-            return None
 
     def refresh_terminal_version(self):
         try:
@@ -236,6 +236,7 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
             return frozenset(d.items())
         done_vers_set = set()
         filtered_done_versions = []
+        print(done_versions)
         for ver in done_versions:
             if to_hashable(ver) in done_vers_set: continue # 跳过重复
             done_vers_set.add(to_hashable(ver))
@@ -253,7 +254,7 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
                 self.send_message(f'已刷新{len(versions[0])}个版本！', Message.Level.DONE)
                     
             if versions[2] != []: # 出现版本解析失败的情况，告知玩家
-                self.send_dialog('有些版本无法导入...', Dialog.Level.ERROR, f'以下版本无法正常导入：\n{'\n'.join(versions[2])}')
+                self.send_dialog('有些版本刷新失败...', Dialog.Level.ERROR, f'以下版本刷新时出现问题：\n{'\n'.join(versions[2])}')
             
             return versions[0]
 
@@ -261,7 +262,11 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
             # 首先要检测询问版本的内容是否已经存在于old_versions
             query_vers = []
             for i in range(0, len(versions[1]), 2):
-                if versions[1][i] not in old_versions and versions[1][i+1] not in old_versions: # 与原版本信息出现不同，需要询问
+                if versions[1][i] in old_versions:
+                    versions[0].append(versions[1][i])
+                elif versions[1][i+1] in old_versions:
+                    versions[0].append(versions[1][i+1])
+                else: # 与原版本信息出现不同，需要询问
                     query_vers.append(versions[1][i])
                     query_vers.append(versions[1][i+1])
             

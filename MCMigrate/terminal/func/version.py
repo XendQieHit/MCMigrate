@@ -158,7 +158,7 @@ def parse_single_ver_path(p: Path) -> list[dict] | tuple[dict, dict] | None:
         if is_confirmed: # 解析成功，直接返回结果
             return results
 
-        return (parse_version_info(p, "unknown", True), parse_version_info(p, "unknown", False)) # 无法判断版本隔离，返回tuple
+        return (parse_version_info(p, None, True), parse_version_info(p, None, False)) # 无法判断版本隔离，返回tuple
 
 def is_indie_pcl(pcl_folder) -> bool:
     pcl_ini_file_name = 'Setup.ini'
@@ -281,9 +281,15 @@ def refresh_version_info(version: dict) -> list[dict] | tuple[dict, dict] | None
     '''
     同步启动器更改，更新该版本的信息
     '''
-    game_jar = Path(version['game_jar'])
-    p_result = parse_single_ver_path(game_jar.parent)
-    print(p_result)
+    try:
+        game_jar = Path(version['game_jar'])
+        p_result = parse_single_ver_path(game_jar.parent)
+        print(p_result)
+    except KeyError: # 兼容0.0.4版本之前的versions.json格式
+        game_path = Path(version['game_path'])
+        if game_path.name == '.minecraft': return # 非隔离版本就没法确定了，无视
+        p_result = parse_single_ver_path(game_path)
+    
     logger.info(f"已更新{version['name']}版本信息") # 总有种不想的预感...会不会什么奇怪的版本名就把这个爆了吧...?
     return p_result
 

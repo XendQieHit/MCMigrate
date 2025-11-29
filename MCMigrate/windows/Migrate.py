@@ -244,7 +244,7 @@ class Migrate(SendMessageable):
             self.info_layout.addWidget(self.info_name)
 
             # 启动器标签
-            self.launcher = QtWidgets.QLabel(json.get('launcher', '未知启动器'))
+            self.launcher = QtWidgets.QLabel(json.get('launcher', '未知启动器') or '未知启动器')
             self.launcher.setObjectName('launcher_label')
             self.launcher.setStyleSheet(load_stylesheet(resource_path("qss/migrate.qss")))
             self.info_name_layout.addWidget(self.launcher, 0)
