@@ -51,6 +51,17 @@ QLabel#name_label {
     color: #333333;
 }
 
+/* 启动器标签 */
+QLabel#launcher_label {
+    font-size: 12px;
+    font-weight: bold;
+    color: '#ffffff';
+    background: '#42abb5';
+    padding: 3px;
+    border: none;
+    border-radius: 4px
+}
+
 /* 非版本隔离提示 */
 QLabel#indie_label {
     font-size: 12px;

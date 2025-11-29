@@ -12,3 +12,18 @@ QPushButton#button_import:hover {
 QPushButton#button_import:pressed {
     background-color: '#40a343'
 }
+
+QPushButton#button_import_pcl {
+    font-size: 20px;
+    background-color: '#2a76ce';
+    color: white;
+    padding: 20px;
+    border: none;
+    border-radius: 10px
+}
+QPushButton#button_import_pcl:hover {
+    background-color: '#3280d9'
+}
+QPushButton#button_import_pcl:pressed {
+    background-color: '#2670c5'
+}

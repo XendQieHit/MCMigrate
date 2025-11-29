@@ -1,6 +1,6 @@
 from enum import Enum
 from PySide6 import QtWidgets, QtGui, QtCore
-from terminal.Terminal import Terminal
+from terminal.Terminal import Terminal, TaskMigrateAbortable
 
 from message import Dialog, Message
 from windows.loadStyleSheet import load_stylesheet
@@ -9,7 +9,7 @@ from utils.func import resource_path
 import Geometry, GeometryIcon
 
 class MigrateDetail(SendMessageable):
-    def __init__(self, terminal: Terminal, migrate_task: Terminal.TaskMigrateAbortable, pre_window: QtWidgets.QFrame):
+    def __init__(self, terminal: Terminal, migrate_task: TaskMigrateAbortable, pre_window: QtWidgets.QFrame):
         super().__init__(terminal.main_window)
         self.pre_window = pre_window
         self.terminal = terminal

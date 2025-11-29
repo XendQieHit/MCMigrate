@@ -1,6 +1,6 @@
 import logging, json
 from PySide6 import QtWidgets, QtGui, QtCore
-from terminal.Terminal import Terminal
+from terminal.Terminal import Terminal, TaskMigrateAbortable
 from pathlib import Path
 
 from windows.SendMessageable import SendMessageable
@@ -11,7 +11,7 @@ from utils.ClientLibs import ColorIconGenerator
 import Geometry, MCException, Animation
 
 class Migrate(SendMessageable):
-    def __init__(self, terminal: Terminal, version_paths: list[dict], migrate_task: Terminal.TaskMigrateAbortable=None):
+    def __init__(self, terminal: Terminal, version_paths: list[dict], migrate_task: TaskMigrateAbortable=None):
         super().__init__(terminal.main_window)
         self.versions = version_paths
         self.terminal = terminal
@@ -31,8 +31,21 @@ class Migrate(SendMessageable):
         self.top_bar.setFixedHeight(self.window_title.height())
         self.top_bar.layout().addStretch()
         self.top_bar.layout().setContentsMargins(0,0,0,0)
+        # 刷新全部版本按钮
+        self.refresh_all_vers_btn = Migrate.TopBarButton(QtGui.QColor("#77D380"), QtGui.QColor("#4BBD68"), resource_path("assets/refresh.svg"), '刷新所有版本信息', self)
+        self.refresh_all_vers_btn.clicked.connect(lambda: self.dialog.info(
+            "确定刷新所有版本？",
+            "操作过程中，可能需要你再次确认版本隔离情况。\n版本数量很多时，执行该操作可能需要一些时间。\n\n确定要刷新所有版本吗？",
+            (
+                "确定",
+                Dialog.Level.DONE,
+                self.button_refresh_all_vers_clicked
+            ),
+            close_when_clicked_any_btn=True
+        ))
+        self.top_bar.layout().addWidget(self.refresh_all_vers_btn, 0)
         # 清空所有版本按钮
-        self.clear_all_vers_btn = Migrate.TopBarButton(QtGui.QColor("#f05f5a"), QtGui.QColor("#e14d48"), resource_path("assets/delete.svg"), '清除列表里所有的版本', self) # 是的你的ide没有出错，QColor应用在QGraphicsColorizeEffect时，alpha通道值要放前面
+        self.clear_all_vers_btn = Migrate.TopBarButton(QtGui.QColor("#f05f5a"), QtGui.QColor("#d94641"), resource_path("assets/delete.svg"), '清除列表里所有的版本', self) # 是的你的ide没有出错，QColor应用在QGraphicsColorizeEffect时，alpha通道值要放前面
         self.clear_all_vers_btn.clicked.connect(lambda: self.dialog.error(
             "确定清除所有版本？",
             "该操作将会清除列表里的所有版本！\n该操作不会对游戏文件本体产生影响。\n\n确定要清除所有版本吗？",
@@ -101,8 +114,17 @@ class Migrate(SendMessageable):
             if not self.migrate_task.is_calculating:
                 self.button_migrate_detail.update_percent()
 
+    def button_refresh_all_vers_clicked(self):
+        if versions:= self.terminal.refresh_all_versions_info():
+            # 刷新版本列表，如果遇到需要询问版本隔离的情况的话，下面代码不会执行，而是terminal手动执行switch_window()方法来刷新界面
+            self.versions = versions
+            self.ver_list_source.update_versions(versions)
+            self.ver_list_target.update_versions(versions)
+            self.window().update()
+
     def button_import_clicked(self):
         if versions:= self.terminal.import_version():
+            # 刷新版本列表，如果遇到需要询问版本隔离的情况的话，下面代码不会执行，而是terminal手动执行switch_window()方法来刷新界面
             self.versions = versions
             self.ver_list_source.update_versions(versions)
             self.ver_list_target.update_versions(versions)
@@ -221,6 +243,12 @@ class Migrate(SendMessageable):
             self.info_name.setLayout(self.info_name_layout)
             self.info_layout.addWidget(self.info_name)
 
+            # 启动器标签
+            self.launcher = QtWidgets.QLabel(json.get('launcher', '未知启动器'))
+            self.launcher.setObjectName('launcher_label')
+            self.launcher.setStyleSheet(load_stylesheet(resource_path("qss/migrate.qss")))
+            self.info_name_layout.addWidget(self.launcher, 0)
+
             # 加载器标签
             self.mod_loader = QtWidgets.QLabel(json.get('mod_loader', '未知Mod加载器'))
             self.mod_loader.setObjectName('mod_loader_label')
@@ -242,7 +270,7 @@ class Migrate(SendMessageable):
 
             self.info_name_layout.addStretch()
 
-            # 版本号标签和版本文件路径的容器
+            # 版本号、启动器标签和版本文件路径的容器
             self.info_detail = QtWidgets.QWidget()
             self.info_detail.setObjectName('info_detail')
             self.info_detail.setStyleSheet(load_stylesheet(resource_path("qss/migrate.qss")))
@@ -480,7 +508,7 @@ class ButtonMigrateDetail(QtWidgets.QPushButton):
         self.shadow.setStyleSheet("background-color: '#5f9772'; border-radius: 35px")
         self.move(self.parentWidget().width() - self._size - 20, self.parentWidget().height() - self._size - 20)
     
-    def set_migrate_task(self, migrate_task: Terminal.TaskMigrateAbortable):
+    def set_migrate_task(self, migrate_task: TaskMigrateAbortable):
         # 点击后转至MigrateDetail界面
         self.clicked.connect(lambda: self.terminal.switch_window(Terminal.WindowEnum.MIGRATE_DETAIL, migrate_task, self.parent()))
     
