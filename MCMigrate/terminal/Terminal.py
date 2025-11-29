@@ -236,7 +236,6 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
             return frozenset(d.items())
         done_vers_set = set()
         filtered_done_versions = []
-        print(done_versions)
         for ver in done_versions:
             if to_hashable(ver) in done_vers_set: continue # 跳过重复
             done_vers_set.add(to_hashable(ver))

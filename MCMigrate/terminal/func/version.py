@@ -284,7 +284,6 @@ def refresh_version_info(version: dict) -> list[dict] | tuple[dict, dict] | None
     try:
         game_jar = Path(version['game_jar'])
         p_result = parse_single_ver_path(game_jar.parent)
-        print(p_result)
     except KeyError: # 兼容0.0.4版本之前的versions.json格式
         game_path = Path(version['game_path'])
         if game_path.name == '.minecraft': return # 非隔离版本就没法确定了，无视
