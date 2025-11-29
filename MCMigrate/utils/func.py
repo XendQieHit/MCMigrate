@@ -2,11 +2,11 @@
 import shutil, sys, os, re
 from pathlib import Path
 
-def sort_log_folder(LOG_DIR: str):
+def clean_log_folder(LOG_DIR: str):
     '''清理logs，维持日志文件数量在7个'''
-    dir_path = Path(LOG_DIR).iterdir()
+    dir_path = tuple(Path(LOG_DIR).iterdir())
     if len(dir_path) <= 7: return
-    for item in tuple(dir_path)[:-8]:
+    for item in dir_path[:-8]:
         if item.is_file() or item.is_symlink():
             item.unlink()  # 删除文件或符号链接
         elif item.is_dir():

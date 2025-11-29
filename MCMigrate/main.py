@@ -39,7 +39,7 @@ def qt_message_handler(mode, context, message):
 QtCore.qInstallMessageHandler(qt_message_handler)
 
 # 清理过时log
-func.sort_log_folder(LOG_DIR)
+func.clean_log_folder(LOG_DIR)
 
 class MainWindow(DisplayMessageable, QtWidgets.QMainWindow):
     change_central_widget = QtCore.Signal()
