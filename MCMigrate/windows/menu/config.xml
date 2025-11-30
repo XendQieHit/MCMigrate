@@ -1,0 +1,32 @@
+<view class="config" title="设置">
+    <section title="迁移">
+        <subsection title="文件">
+            <subsection title="原版本">
+                <options title="选择数据迁移的规则">
+                    <option>默认</option>
+                    <option>黑名单</option>
+                    <option>白名单</option>
+                </options>
+            </subsection>
+            <subsection title="目标版本">
+                <options title="对原有的文件的进行操作">
+                    <option>保留</option>
+                    <option>替换</option>
+                    <option>清空</option>
+                </options>
+                <options title="对原有的模组文件的操作">
+                    <option>保留</option>
+                    <option>替换</option>
+                    <option>清空</option>
+                </options>
+            </subsection>
+        </subsection>
+    </section>
+    <section title="功能">
+        <subsection title="导入">
+        </subsection>
+    </section>
+    <section title="外观">
+        <palette title="主题色"></palette>
+    </section>
+</view>

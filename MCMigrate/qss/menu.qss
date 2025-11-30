@@ -1,0 +1,12 @@
+#optionBar {
+    background
+}
+#optionBarTitle {
+
+}
+#optionBarItem {
+
+}
+#optionBarItem > QPushButton {
+    
+}

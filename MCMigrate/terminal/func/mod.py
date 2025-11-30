@@ -84,7 +84,7 @@ def modrinth_update(target_version: str, mod_loader: str, source_dir: str, old_f
         return Result.FAILED
 
     # 下载模组依赖
-    failed_dps = modrinth_dl_dependencies(latest_version_json, mod_loader, target_version)
+    failed_dps = modrinth_dl_dependencies(latest_version_json, mod_loader, target_version, target_dir)
 
     # 下载模组
     try:
@@ -235,6 +235,7 @@ def modrinth_dl_dependencies(version: dict, mod_loader: str, target_version: str
         返回对象为list[str], 有些依赖库下载失败了...该list里面包含下载失败的依赖名称
     """
     dependencies = modrinth_get_dependencies(version)
+    if not dependencies: return Result.SUCCESS
 
     failed_dps = []
     for d in dependencies:

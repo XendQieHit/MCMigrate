@@ -4,7 +4,7 @@
 以及不能使用在 已经有应用到QGraphicEffect的widget上！
 '''
 from PySide6 import QtCore, QtWidgets, QtGui, QtSvg
-from utils import ClientLibs
+from core import ClientLibs
 from typing import Callable
 
 class FadeIn(QtCore.QPropertyAnimation):

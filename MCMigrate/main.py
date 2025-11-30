@@ -1,16 +1,13 @@
 from PySide6 import QtCore, QtWidgets, QtGui
-from utils import func
 from terminal.Terminal import Terminal
 from terminal.func import version
 from logging.handlers import TimedRotatingFileHandler
-from pathlib import Path
-import os, sys, logging, time, json
+import os, sys, logging, time, json, core.func
 
 from windows.Migrate import Migrate
 from windows.Welcome import Welcome
+from windows.MainWindow import MainWindow
 from message import Dialog
-from message.DisplayMessageable import DisplayMessageable
-from collections import deque
 
 # 配置日志文件夹
 BASE_DIR = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
@@ -39,24 +36,13 @@ def qt_message_handler(mode, context, message):
 QtCore.qInstallMessageHandler(qt_message_handler)
 
 # 清理过时log
-func.clean_log_folder(LOG_DIR)
-
-class MainWindow(DisplayMessageable, QtWidgets.QMainWindow):
-    change_central_widget = QtCore.Signal()
-    def __init__(self):
-        super().__init__()
-
-    # 防止窗口在切换的时候悬浮组件被遮盖
-    def setCentralWidget(self, widget: QtWidgets.QWidget):
-        super().setCentralWidget(widget)
-        if self.message.current_message: self.message.current_message.raise_()
-        if self.dialog.current_dialog: self.dialog.current_dialog.raise_()
+core.func.clean_log_folder(LOG_DIR)
         
 # 初始化主窗口
 app = QtWidgets.QApplication([])
 window = MainWindow()
 window.setWindowTitle("MCMigrator")
-window.setWindowIcon(QtGui.QIcon(func.resource_path("assets/icon_64x64.png")))
+window.setWindowIcon(QtGui.QIcon(core.func.resource_path("assets/icon_64x64.png")))
 window.resize(800, 400)
 
 # 设置全局异常处理器

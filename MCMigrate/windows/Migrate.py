@@ -6,8 +6,8 @@ from pathlib import Path
 from windows.SendMessageable import SendMessageable
 from message import Message, Dialog
 from windows.loadStyleSheet import load_stylesheet
-from utils.func import resource_path
-from utils.ClientLibs import ColorIconGenerator
+from core.func import resource_path
+from core.ClientLibs import ColorIconGenerator
 import Geometry, MCException, Animation
 
 class Migrate(SendMessageable):

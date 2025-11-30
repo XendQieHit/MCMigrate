@@ -5,7 +5,7 @@ from terminal.Terminal import Terminal, TaskMigrateAbortable
 from message import Dialog, Message
 from windows.loadStyleSheet import load_stylesheet
 from windows.SendMessageable import SendMessageable
-from utils.func import resource_path
+from core.func import resource_path
 import Geometry, GeometryIcon
 
 class MigrateDetail(SendMessageable):

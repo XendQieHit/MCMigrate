@@ -2,6 +2,7 @@ from enum import Enum
 from typing import List, Callable
 from pathlib import Path
 from PySide6 import QtWidgets, QtCore
+from windows.MainWindow import MainWindow
 import os, shutil, json, logging
 
 from utils import func
@@ -12,7 +13,7 @@ import MCException
 logging.basicConfig(level=logging.INFO)
 
 class Terminal(Message.Messageable, Dialog.Dialogable):
-    def __init__(self, main_window: QtWidgets.QMainWindow):
+    def __init__(self, main_window: MainWindow):
         super().__init__(__name__)
         self.config = config.get_config()
         self.main_window = main_window
