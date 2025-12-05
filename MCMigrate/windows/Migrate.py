@@ -5,9 +5,9 @@ from pathlib import Path
 
 from windows.SendMessageable import SendMessageable
 from message import Message, Dialog
-from windows.loadStyleSheet import load_stylesheet
-from core.func import resource_path
+from core.func import resource_path, load_stylesheet
 from core.ClientLibs import ColorIconGenerator
+from core import WidgetLibs
 import Geometry, MCException, Animation
 
 class Migrate(SendMessageable):
@@ -184,7 +184,7 @@ class Migrate(SendMessageable):
 
         def enterEvent(self, event):
             super().enterEvent(event)
-            self.anim_btn = Animation.ChangeColorTransiting(self, QtGui.QColor(self.theme_color), duration=120)
+            self.anim_btn = Animation.ChangeColor(self, QtGui.QColor(self.theme_color), duration=120, color_role=QtGui.QPalette.ColorRole.Button)
             self.anim_icon = Animation.ChangeButtonIconColorTransiting(self, self.icon_gen, QtGui.QColor(self.default_color), duration=120)
             self.anim = QtCore.QParallelAnimationGroup()
             self.anim.addAnimation(self.anim_btn)
@@ -193,7 +193,7 @@ class Migrate(SendMessageable):
 
         def leaveEvent(self, event):
             super().leaveEvent(event)
-            self.anim_btn = Animation.ChangeColorTransiting(self, QtGui.QColor(self.default_color), duration=120)
+            self.anim_btn = Animation.ChangeColor(self, QtGui.QColor(self.default_color), duration=120, color_role=QtGui.QPalette.ColorRole.Button)
             self.anim_icon = Animation.ChangeButtonIconColorTransiting(self, self.icon_gen, QtGui.QColor(self.theme_color), duration=120)
             self.anim = QtCore.QParallelAnimationGroup()
             self.anim.addAnimation(self.anim_btn)
@@ -202,9 +202,11 @@ class Migrate(SendMessageable):
 
         def mousePressEvent(self, e):
             super().mousePressEvent(e)
-            palette = self.palette()
-            palette.setColor(QtGui.QPalette.ColorRole.Button, QtGui.QColor(self.clicked_color))
-            self.setPalette(palette)
+            self.anim = QtCore.QSequentialAnimationGroup()
+            self.anim.addAnimation(Animation.ChangeColor(self, self.clicked_color, color_role=QtGui.QPalette.ColorRole.Button, duration=100))  
+            self.anim.addPause(120)
+            self.anim.addAnimation(Animation.ChangeColor(self, self.theme_color, color_role=QtGui.QPalette.ColorRole.Button, duration=60))
+            self.anim.start()
 
     class VersionItem(QtWidgets.QWidget):
         def __init__(self, json: dict, parent_list: 'Migrate.VersionList'):
@@ -446,6 +448,9 @@ class Migrate(SendMessageable):
                 self.anim.start()
                 self.show()  # 确保在动画期间可见
 
+    class GameFolderSelection(WidgetLibs.CollapsibleBox):
+        def __init__(self, text, parent=None, fold_when_clicked_item=True):
+            super().__init__(text, parent, fold_when_clicked_item=fold_when_clicked_item)
 
     class VersionList(QtWidgets.QListWidget):
         def __init__(self, version_list: list[dict], parent_widget=None):
@@ -455,6 +460,8 @@ class Migrate(SendMessageable):
                 self.add_version(Migrate.VersionItem(version, self))
             self.setStyleSheet(resource_path(load_stylesheet(resource_path("qss/migrate.qss"))))
             self.setSpacing(5)
+
+            # 游戏文件夹列表
 
             # 通过监听滑条移动来动态调整实现VersionItem的FloatBar工具栏与列表相对静止
             self.hover_item: Migrate.VersionItem = None
@@ -481,6 +488,8 @@ class Migrate(SendMessageable):
             for ver in versions:
                 self.add_version(Migrate.VersionItem(ver, self))
             logging.info("已更新版本列表")
+    
+    
             
 class ButtonMigrateDetail(QtWidgets.QPushButton):
     '''任务详情的按钮，在被调用之前必须先set_migrate_task()'''

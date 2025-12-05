@@ -1,5 +1,5 @@
 from pathlib import Path
-import os, sys, shutil
+import os, sys, shutil, logging
 
 def clean_log_folder(LOG_DIR: str):
     '''清理logs，维持日志文件数量在7个'''
@@ -17,3 +17,12 @@ def resource_path(relative_path):
         # PyInstaller 打包后，资源在 _MEIPASS 临时目录
         return os.path.join(sys._MEIPASS, relative_path)
     return os.path.join(os.path.abspath('.'), relative_path)
+
+def load_stylesheet(path):
+    '''根据路径读取指定qss文件里的样式'''
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            return f.read()
+    except Exception as e:
+        logging.error(f"加载样式表失败: {e}")
+        return ""

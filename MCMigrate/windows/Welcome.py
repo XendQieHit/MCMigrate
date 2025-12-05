@@ -4,10 +4,9 @@ from PySide6 import QtWidgets, QtGui, QtCore
 from terminal.Terminal import Terminal
 from pathlib import Path
 
-from windows.loadStyleSheet import load_stylesheet
 from windows.SendMessageable import SendMessageable
 from message import Message
-from core.func import resource_path
+from core.func import resource_path, load_stylesheet
 import MCException
 
 # 欢迎界面

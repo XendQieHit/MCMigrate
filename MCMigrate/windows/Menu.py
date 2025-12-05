@@ -7,9 +7,8 @@ from PySide6 import QtWidgets, QtGui, QtCore
 from pathlib import Path
 from terminal.Terminal import Terminal
 from terminal.func import config
-from core.func import resource_path
 from windows.SendMessageable import SendMessageable
-from windows.loadStyleSheet import load_stylesheet
+from core.func import load_stylesheet, resource_path
 from message import Message, Dialog
 
 class Menu(SendMessageable):
@@ -55,6 +54,7 @@ class ContentArea(QtWidgets.QFrame):
         with open(xml_path, 'r', encoding='utf-8') as f:
             data = ElementTree.parse(f)
         for root in data.iter():
+            pass
             
 
 if __name__ == '__main__':

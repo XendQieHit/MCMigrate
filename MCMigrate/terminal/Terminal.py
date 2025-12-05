@@ -475,12 +475,14 @@ class TaskMigrateAbortable(QtCore.QObject):
                 report_content += f"以下模组在 {self.target_json.get('mod_loader')}-{self.target_json.get('version')} 版本中没有适配：\n"
                 for file in self.failed_mods_not_adapt:
                     report_content += file + '\n'
+                report_content += '\n'
 
             # 模组下载失败
             if self.failed_mods_dl != []:
                 report_content += f"以下模组下载失败：\n"
                 for file in self.failed_mods_dl:
                     report_content += file + '\n'
+                report_content += '\n'
 
             # 文件迁移失败（这个部分问题就比较多了，就由说明具体错误
             if self.failed_files_copy != []:
@@ -489,6 +491,7 @@ class TaskMigrateAbortable(QtCore.QObject):
                 report_content += f"以下文件在迁移时出错：\n"
                 for file in self.failed_files_copy:
                     report_content += f"{file[0]}：{file[1]}\n"
+                report_content += '\n'
             self.terminal.send_dialog(
                 title,
                 level,

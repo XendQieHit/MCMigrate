@@ -3,9 +3,8 @@ from PySide6 import QtWidgets, QtGui, QtCore
 from terminal.Terminal import Terminal, TaskMigrateAbortable
 
 from message import Dialog, Message
-from windows.loadStyleSheet import load_stylesheet
 from windows.SendMessageable import SendMessageable
-from core.func import resource_path
+from core.func import resource_path, load_stylesheet
 import Geometry, GeometryIcon
 
 class MigrateDetail(SendMessageable):

@@ -1,0 +1,12 @@
+#selection_bar {
+    border: 1px solid '#e1e5e7';
+    background-color: '#f1f5f7';
+    border-radius: 5px;
+    font-size: 14px
+}
+#selection_bar:hover {
+    
+}
+#selection_bar:pressed {
+    
+}

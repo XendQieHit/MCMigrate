@@ -7,9 +7,8 @@ from PySide6 import QtWidgets, QtCore, QtGui
 from typing import Callable, Dict, Any, Iterable
 from enum import Enum
 from dataclasses import dataclass
-from windows.loadStyleSheet import load_stylesheet
 from utils.func import hex_rgba_to_tuple
-from core.func import resource_path
+from core.func import resource_path, load_stylesheet
 import Animation
 
 class Level(Enum):
