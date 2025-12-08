@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import List
+from dataclasses import dataclass, asdict
 import json, re, zipfile, os, winreg
 import logging, MCException
 
@@ -7,7 +8,34 @@ import logging, MCException
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def get_versions_from_pcl() -> tuple[dict] | list[list[dict], list[dict], list[str]]:
+@dataclass
+class PathParseResult:
+    '''用于包装解析结果的类'''
+    is_suc: bool
+    folder_name: str
+    folder_path: str
+    done_vers: list[dict]
+    query_ver: list[dict]
+    failed_vers: list[str]
+
+    def to_dict(self):
+        return {'folder_name': self.folder_name, 'folder_path': self.folder_path, 'versions': self.done_vers}
+
+@dataclass
+class VersionParseResult:
+    '''用于模板化版本dict，这样就不用改的很费劲了'''
+    game_jar: str
+    name: str
+    game_path: str
+    version: str
+    mod_loader: str
+    is_indie: bool
+    launcher: str
+
+    def to_dict(self):
+        return asdict(self)
+
+def get_versions_from_pcl() -> list[PathParseResult]:
     '''从pcl导入mc版本, Returns与add_version()方法相同'''
     # 获取PCL在注册表存储的.minecraft文件夹路径数据
     try:
@@ -24,39 +52,39 @@ def get_versions_from_pcl() -> tuple[dict] | list[list[dict], list[dict], list[s
         logger.error(f"读取注册表时发生了意外的错误：{e}")
     finally: winreg.CloseKey(winreg.HKEY_CURRENT_USER)
 
-    # 拆分解析数据
-    done_vers = []
-    query_vers = []
-    failed_vers = []
+    parse_results: list[PathParseResult] = []
     for p_info in value.split("|"):
-        p_name, p_path = p_info.split(">") # p_name是在PCL里，用户给.minecraft游戏文件夹取的自定义名称，这部分等以后做项目折叠的时候再弄吧
-        vers = add_version(Path(p_path))
-        if isinstance(vers, list): # 有意外情况
-            done_vers.extend(vers[0])
-            query_vers.extend(vers[1])
-            failed_vers.extend(vers[2])
-        elif isinstance(vers, tuple): # 全部导入成功
-            done_vers.extend(vers)
+        # 拆分解析数据
+        p_name, p_path = p_info.split(">") # p_name是在PCL里，用户给.minecraft游戏文件夹取的自定义名称
+        folder_path = Path(p_path)
+        result = add_version(folder_path)
+        result.folder_name = p_name
+        parse_results.append(result)
 
-    if query_vers == [] and failed_vers == []:
-        return done_vers
-    return [done_vers, query_vers, failed_vers]
+    return parse_results
 
-def add_version(path: Path) -> tuple[dict] | list[list[dict], list[dict], list[str]]:
+def add_version(path: Path) -> PathParseResult:
     '''
     解析并获取版本信息
-        返回对象为tuple[dict]，则说明无异常，可直接使用
-        返回对象为None, 说明解析失败或未找到
-        返回对象为list[list[dict], list[dict], list[dict]]，则发现无法判断是否版本隔离的版本，
-        list[0]是已判断成功的版本信息，
-        list[1]是无法判断成功的版本信息，其中，每个版本各有一份隔离和非隔离的版本信息，需要用户判断是否为版本隔离来决定剔除。
-        list[2]是解析失败的版本
-    该方法只是获取解析到的版本信息，具体将其同步添加到本地的versions.json，还需要将获取到的值解析并调用update_versions_json(versions)方法
+    tuple[0]为该游戏文件夹的空白json，tuple[1]为对该游戏文件夹的解析结果
+        \n解析结果为tuple[dict]，则说明无异常，可直接使用
+        \n解析结果为None, 说明解析失败或未找到
+        \n解析结果为list[list[dict], list[dict], list[dict]]，则发现无法判断是否版本隔离的版本，
+        \nlist[0]是已判断成功的版本信息，
+        \nlist[1]是无法判断成功的版本信息，其中，每个版本各有一份隔离和非隔离的版本信息，需要用户判断是否为版本隔离来决定剔除。
+        \nlist[2]是解析失败的版本
+    \n该方法只是获取解析到的版本信息，具体将其同步添加到本地的versions.json，还需要将获取到的值解析并调用update_versions_json(versions)方法
     '''
     # 检测是否是游戏文件夹
     if path.name == ".minecraft" or (path / "versions").is_dir():
         logger.info("找到游戏文件夹，正在解析导入游戏版本...")
-        return parse_path(path)
+
+        # 获取并打包解析结果
+        game_name = path.parent.name
+        versions = parse_path(path)
+        if isinstance(versions, tuple):
+            return PathParseResult(True, game_name, path.as_posix(),  versions)
+        return PathParseResult(False, game_name, path.as_posix(), versions)
     raise MCException.NotMCGameFolder()
     
 def update_versions_json(versions: tuple[dict]):
@@ -224,13 +252,13 @@ def parse_version_info(path: Path, launcher, is_indie=True) -> dict | None:
                     if fabric != None:
                         # Quilt
                         if quilt:
-                            return {'game_jar': game_jar ,'name': path.name, 'game_path': game_path, 'version': fabric, 'mod_loader': 'quilt', 'is_indie': is_indie, 'launcher': launcher}
-                        return {'game_jar': game_jar ,'name': path.name, 'game_path': game_path, 'version': fabric.group(), 'mod_loader': 'fabric', 'is_indie': is_indie, 'launcher': launcher}
+                            return VersionParseResult(game_jar, path.name, game_path, fabric.group(), 'quilt', is_indie, launcher).to_dict()
+                        return VersionParseResult(game_jar, path.name, game_path, fabric.group(), 'fabric', is_indie, launcher).to_dict()
                     
                     # Forge
                     forge = re.search(r'(?<=net\.minecraftforge:forge:)[^-]*', item.get("name"))
                     if forge != None:
-                        return {'game_jar': game_jar ,'name': path.name, 'game_path': game_path, 'version': forge.group(), 'mod_loader': 'forge', 'is_indie': is_indie, 'launcher': launcher}
+                        return VersionParseResult(game_jar, path.name, game_path, forge.group(), 'forge', is_indie, launcher).to_dict()
 
                     # Optifine
                     optifine = re.search(r'(?<=(optifine:OptiFine:))[^_]*', item.get("name"))
@@ -242,11 +270,11 @@ def parse_version_info(path: Path, launcher, is_indie=True) -> dict | None:
                 game: List[str] = content.get('arguments').get('game')
                 for i in range(len(game)):
                     if game[i] == "--fml.mcVersion":
-                        return {'game_jar': game_jar ,'name': path.name, 'game_path': game_path, 'version': game[i+1], 'mod_loader': 'neoforge', 'is_indie': is_indie, 'launcher': launcher}
+                        return VersionParseResult(game_jar, path.name, game_path, game[i+1], 'neoforge', is_indie, launcher).to_dict()
                 
                 # 因为有可能forge和fabric在启动器时一起安装，会导致两个特征词条都会出现，因此需要后置区别
                 if secondary_mod_loader != '':
-                    return  {'game_jar': game_jar ,'name': path.name, 'game_path': game_path, 'version': version, 'mod_loader': secondary_mod_loader, 'is_indie': is_indie, 'launcher': launcher}
+                    return VersionParseResult(game_jar, path.name, game_path, version, secondary_mod_loader, is_indie, launcher).to_dict()
                 
         except (KeyError, AttributeError, TypeError):
             # 找不到libraries，换个方式打开...?
@@ -259,9 +287,9 @@ def parse_version_info(path: Path, launcher, is_indie=True) -> dict | None:
             pcl = content.get('clientVersion', False)
             ver_type = content.get('type', None)
             if hmcl: # HMCL
-                return {'game_jar': game_jar ,'name': path.name, 'game_path': game_path, 'version': hmcl[0]['version'], 'mod_loader': ver_type, 'is_indie': is_indie, 'launcher': launcher}
+                return VersionParseResult(game_jar, path.name, game_path, hmcl[0]['version'], ver_type, is_indie, launcher).to_dict()
             elif pcl: # PCL
-                return {'game_jar': game_jar, 'name': path.name, 'game_path': game_path, 'version': pcl, 'mod_loader': ver_type, 'is_indie': is_indie, 'launcher': launcher}
+                return VersionParseResult(game_jar, path.name, game_path, pcl, ver_type, is_indie, launcher).to_dict()
         except (KeyError, AttributeError):
             # 看来都没有
             continue
@@ -272,7 +300,7 @@ def parse_version_info(path: Path, launcher, is_indie=True) -> dict | None:
             logger.info("解析版本jar包")
             with jar_file.open('version.json', 'r') as json_file:
                 logger.info("读取完成")
-                return {'game_jar': game_jar, 'name': path.name, 'game_path': game_path, 'version': json.load(json_file)['id'], 'mod_loader': ver_type, 'is_indie': is_indie, 'launcher': launcher}
+                return VersionParseResult(game_jar, path.name, game_path, json.load(json_file)['id'], ver_type, is_indie, launcher)
     except Exception as e: # 万策尽QAQ————
         logger.error("无法解析版本号: %s", e)
         return None
@@ -297,8 +325,11 @@ def gen_new_versions() -> list[dict]:
         json.dump([], f)
 
 def get_versions() -> list[dict]:
+    # 空文件检测
     if not os.path.exists("versions.json") or os.path.getsize("versions.json") < 8:
         gen_new_versions()
+
+    # 读取
     try:
         with open("versions.json", "r", encoding="utf-8") as f:
             versions = json.load(f)
@@ -311,7 +342,40 @@ def get_versions() -> list[dict]:
         logger.error("读取文件失败")
         raise e
     
-def clear_all_vers(self):
+def clear_all_vers():
     '''清除所有版本信息'''
     if os.path.exists('versions.json'):
         os.remove('versions.json')
+
+def upgrade_versions_json():
+    '''兼容升级旧的versions.json文件'''
+    old_versions = get_versions()
+    game_names = [] # 用于快速判断和索引游戏文件夹在games里的位置
+    games: list[dict] = []
+
+    for ver in old_versions:
+        try:
+            i = game_names.index(Path(ver['game_jar']).parents[3].name) # 判断是否已添加该游戏文件夹
+
+        except ValueError: # 
+            path = Path(ver['game_jar'])
+            game_name = path.parents[3].name # 自动取.mincraft文件夹的上一层文件夹名
+            game_path = path.parents[2]
+            game_versions = []
+
+            # 添加游戏文件夹
+            game_names.append(game_name)
+            i = len(game_names) - 1
+            game_dict = {'folder_name': game_name, 'folder_path': game_path, 'versions': game_versions}
+            games.append(game_dict)
+
+        games[i]['versions'].append(ver)
+
+    try:
+        with open('versions.json', 'w', encoding='utf-8') as f:
+            json.dump(games, f)
+            return games
+            
+    except Exception as e:
+        logger.error("升级versions.json文件失败")
+        raise e

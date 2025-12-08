@@ -35,7 +35,7 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
         if version_path == Path("."): return None # 传空值就忽略，什么消息也不发
         # 开始解析版本路径
         try:
-            return self.check_import_versions(self.add_version(version_path))
+            return self.check_import_result(version.add_version(version_path))
         except MCException.NotMCGameFolder as e:
             self.send_message(f"{e}", Message.Level.ERROR)
             return None
@@ -44,10 +44,10 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
             return None
 
     def import_versions_from_pcl(self):
-        return self.check_import_versions(version.get_versions_from_pcl())
+        return self.check_import_result(version.get_versions_from_pcl())
         
-    def check_import_versions(self, versions: tuple[dict] | list[list[dict], list[dict], list[dict]]):
-        def _finish_import_versions() -> list[dict]: 
+    def check_import_result(self, result: version.PathParseResult | list[version.PathParseResult]):
+        def _finish_import_versions() -> list[dict]:
             try:
                 if versions:= version.get_versions():
                     self.versions_json = versions
@@ -63,9 +63,13 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
                 self.send_message(f"发生了意外的错误：{e}", Message.Level.ERROR)
                 return None
 
-        if isinstance(versions, list):
-            if versions[1] != []: # 出现无法判断版本隔离的情况，让用户判断
-                series = self.get_query_dialog_series(versions)
+        if result.is_suc: # 哇哦！居然全解析成功了！直接用这个数据同步到本地并更新前端
+            self.update_versions_json(result)
+            return _finish_import_versions()
+        
+        else:
+            if result.query_ver != []: # 出现无法判断版本隔离的情况，让用户判断
+                series = self.get_query_dialog_series(result)
 
                 # 问答结束后对结果的处理
                 @QtCore.Slot(object)
@@ -83,52 +87,52 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
                 self.ask_in_series(series, _end_asked)
 
             else: # 没有疑问但有无法导入的版本
-                self.send_dialog('有些版本无法导入...', Dialog.Level.ERROR, f'以下版本无法正常导入：\n{'\n'.join(versions[2])}')
-                self.update_versions_json(versions[0])
+                self.send_dialog('有些版本无法导入...', Dialog.Level.ERROR, f'以下版本无法正常导入：\n{'\n'.join(result[2])}')
+                self.update_versions_json(result[0])
                 return _finish_import_versions()
             
-        else: # 哇哦！居然全解析成功了！直接用这个数据同步到本地并更新前端
-            self.update_versions_json(versions)
-            return _finish_import_versions()
-
-    def get_query_dialog_series(self, versions: list[list[dict], list[dict], list[dict]]):
+    def get_query_dialog_series(self, result: version.PathParseResult | list[version.PathParseResult]):
         '''
         生成一个用于询问版本隔离的问答框系列
         Args:
             versions(list[list[dict], list[dict], list[dict]]): 可操作的版本集合，versions[0]为成功解析的版本列表，versions[1]为待询问的版本列表，其中，versions中的偶数项为版本隔离情况下的版本信息dict，奇数项为非版本隔离情况下的版本信息dict。
         '''
-        suc_vers_len = len(versions[0])
-        def add_suc_versions():
-            nonlocal suc_vers_len
-            suc_vers_len+=1
-            return suc_vers_len
-        series = self.gen_a_series('ask_for_indie', versions)
+        if isinstance(result, list):
+            pass
+        else:
+            versions = result.to_dict()['versions']
+            suc_vers_len = len(versions[0])
+            def add_suc_versions():
+                nonlocal suc_vers_len
+                suc_vers_len+=1
+                return suc_vers_len
+            series = self.gen_a_series('ask_for_indie', versions)
 
-        # 递归生成确认问答框
-        def add_next_dialogs(i: int, node: Dialog.DialogSeries.DialogTreeNode):
-            if len(versions[1]) > i+2:
-                action = Dialog.DialogSeries.Action('NEXT', 0)
-            else: action = Dialog.DialogSeries.Action('END', None)
-            node.create_dialog_series_window(
-                        '出现无法确定版本隔离的情况',
-                        Dialog.Level.WARNING,
-                        f"版本名称：{versions[1][i]['name']}\n版本号：{versions[1][i]['version']}\n版本路径：{versions[1][i]['game_path']}\n模组加载器：{versions[1][i]['mod_loader']}\n\n该版本是否启用版本隔离？",
-                    ).add_button(
-                        '是', Dialog.Level.DONE, action, Dialog.DialogSeries.Func(versions[1][i], (0, add_suc_versions()))
-                    ).add_button(
-                        '否', Dialog.Level.ERROR, action, Dialog.DialogSeries.Func(versions[1][i+1], (0, add_suc_versions()))
-                    ).add_button(
-                        '不知道啊', Dialog.Level.INFO, action, Dialog.DialogSeries.Func(versions[1][i], (0, add_suc_versions())), Dialog.DialogSeries.Func(versions[1][i+1], (0, add_suc_versions())), hover_text="将会各添加一个隔离和非隔离的版本"
-                    ).add_button(
-                        '跳过该版本', Dialog.Level.INFO, action
-                    )
+            # 递归生成确认问答框
+            def add_next_dialogs(i: int, node: Dialog.DialogSeries.DialogTreeNode):
+                if len(versions[1]) > i+2:
+                    action = Dialog.DialogSeries.Action('NEXT', 0)
+                else: action = Dialog.DialogSeries.Action('END', None)
+                node.create_dialog_series_window(
+                            '出现无法确定版本隔离的情况',
+                            Dialog.Level.WARNING,
+                            f"版本名称：{versions[1][i]['name']}\n版本号：{versions[1][i]['version']}\n版本路径：{versions[1][i]['game_path']}\n模组加载器：{versions[1][i]['mod_loader']}\n\n该版本是否启用版本隔离？",
+                        ).add_button(
+                            '是', Dialog.Level.DONE, action, Dialog.DialogSeries.Func(versions[1][i], (0, add_suc_versions()))
+                        ).add_button(
+                            '否', Dialog.Level.ERROR, action, Dialog.DialogSeries.Func(versions[1][i+1], (0, add_suc_versions()))
+                        ).add_button(
+                            '不知道啊', Dialog.Level.INFO, action, Dialog.DialogSeries.Func(versions[1][i], (0, add_suc_versions())), Dialog.DialogSeries.Func(versions[1][i+1], (0, add_suc_versions())), hover_text="将会各添加一个隔离和非隔离的版本"
+                        ).add_button(
+                            '跳过该版本', Dialog.Level.INFO, action
+                        )
 
-            i+=2
-            if len(versions[1]) > i:
-                add_next_dialogs(i, node.add_new_dialog_node())
+                i+=2
+                if len(versions[1]) > i:
+                    add_next_dialogs(i, node.add_new_dialog_node())
 
-        add_next_dialogs(0, series.create_dialog_tree())
-        return series
+            add_next_dialogs(0, series.create_dialog_tree())
+            return series
 
     def refresh_terminal_version(self):
         try:
@@ -197,9 +201,6 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
             self.task_migrate = None
         self.task_migrate.terminated.connect(cleanup)
             
-    def add_version(self, path: Path) -> list[dict] | None:
-        return version.add_version(path)
-        
     def update_versions_json(self, versions: list[dict]):
         version.update_versions_json(versions)
 

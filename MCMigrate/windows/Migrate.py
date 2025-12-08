@@ -13,7 +13,7 @@ import Geometry, MCException, Animation
 class Migrate(SendMessageable):
     def __init__(self, terminal: Terminal, version_paths: list[dict], migrate_task: TaskMigrateAbortable=None):
         super().__init__(terminal.main_window)
-        self.versions = version_paths
+        self.games = version_paths
         self.terminal = terminal
         self.migrate_task = migrate_task
         self.setWindowTitle("MCMigrator")
@@ -75,15 +75,15 @@ class Migrate(SendMessageable):
 
         # 版本列表
         self.list_box = QtWidgets.QHBoxLayout()
-        self.ver_list_source = Migrate.VersionList(version_paths, self)
-        self.ver_list_target = Migrate.VersionList(version_paths, self)
-        self.list_box.addWidget(self.ver_list_source)
+        self.game_view_source = Migrate.GameView(version_paths, self)
+        self.game_view_target = Migrate.GameView(version_paths, self)
+        self.list_box.addWidget(self.game_view_source)
 
-        self.arrow = Geometry.Arrow(self.ver_list_source, self.ver_list_target, "#aaaaaa")
+        self.arrow = Geometry.Arrow(self.game_view_source, self.game_view_target, "#aaaaaa")
         self.arrow.setMaximumSize(self.window().height() * 0.05, self.window().width() * 0.05)
         self.list_box.addWidget(self.arrow, 0, QtCore.Qt.AlignCenter)
 
-        self.list_box.addWidget(self.ver_list_target)
+        self.list_box.addWidget(self.game_view_target)
         self.layout.addLayout(self.list_box)
 
         # 底部按钮
@@ -117,17 +117,17 @@ class Migrate(SendMessageable):
     def button_refresh_all_vers_clicked(self):
         if versions:= self.terminal.refresh_all_versions_info():
             # 刷新版本列表，如果遇到需要询问版本隔离的情况的话，下面代码不会执行，而是terminal手动执行switch_window()方法来刷新界面
-            self.versions = versions
-            self.ver_list_source.update_versions(versions)
-            self.ver_list_target.update_versions(versions)
+            self.games = versions
+            self.game_view_source.update_versions(versions)
+            self.game_view_target.update_versions(versions)
             self.window().update()
 
     def button_import_clicked(self):
         if versions:= self.terminal.import_version():
             # 刷新版本列表，如果遇到需要询问版本隔离的情况的话，下面代码不会执行，而是terminal手动执行switch_window()方法来刷新界面
-            self.versions = versions
-            self.ver_list_source.update_versions(versions)
-            self.ver_list_target.update_versions(versions)
+            self.games = versions
+            self.game_view_source.update_versions(versions)
+            self.game_view_target.update_versions(versions)
             self.window().update()
             self.message.done("版本导入成功！")
 
@@ -136,8 +136,8 @@ class Migrate(SendMessageable):
         if self.terminal.thread_migrate.isRunning():
             self.message.info("请先等待迁移完成")
             return
-        ver_source: Migrate.VersionItem = self.ver_list_source.itemWidget(self.ver_list_source.currentItem())
-        ver_target: Migrate.VersionItem = self.ver_list_target.itemWidget(self.ver_list_target.currentItem())
+        ver_source: dict = self.game_view_source.current_version
+        ver_target: dict = self.game_view_target.current_version
         if ver_source == None or ver_target == None:
             logging.info("请先选择迁移版本和目标版本")
             self.message.info("请先选择迁移版本和目标版本")
@@ -146,11 +146,11 @@ class Migrate(SendMessageable):
         # 添加任务详情悬浮按钮
         self.button_migrate_detail = ButtonMigrateDetail(self.terminal, self)
         self.terminal.thread_migrate.finished.connect(self.button_migrate_detail.close_with_animation)
-        self.message.info(f"正在迁移 {ver_source.json.get('name')} 至 {ver_target.json.get('name')}")
+        self.message.info(f"正在迁移 {ver_source.get('name')} 至 {ver_target.get('name')}")
         
         # 开始线程任务
         try:
-            self.terminal.migrate(source_json=ver_source.json, target_json=ver_target.json)
+            self.terminal.migrate(source_json=ver_source, target_json=ver_target)
         except MCException.VersionVerifyFailed as e:
             self.message.show_message(str(e), e.level)
             self.button_migrate_detail.close()
@@ -158,6 +158,9 @@ class Migrate(SendMessageable):
         self.button_migrate_detail.set_migrate_task(self.terminal.task_migrate)
         self.terminal.task_migrate.update_migrate_general.connect(self.button_migrate_detail.update_percent)
         self.button_migrate_detail.show_with_animation()
+    
+    def update_game(self, games_version: list[dict]):
+        self.
 
     def btn_clear_all_vers_clicked(self):
         self.terminal.clear_all_vers()
@@ -207,6 +210,44 @@ class Migrate(SendMessageable):
             self.anim.addPause(120)
             self.anim.addAnimation(Animation.ChangeColor(self, self.theme_color, color_role=QtGui.QPalette.ColorRole.Button, duration=60))
             self.anim.start()
+
+    class VersionList(QtWidgets.QListWidget):
+        def __init__(self, version_list: list[dict], parent, main_window: 'Migrate'=None):
+            super().__init__(parent)
+            self.main_window = main_window
+            # 样式设置
+            for version in version_list:
+                self.add_version(Migrate.VersionItem(version, self))
+            self.setStyleSheet(resource_path(load_stylesheet(resource_path("qss/migrate.qss"))))
+            self.setSpacing(5)
+
+            # 游戏文件夹列表
+
+            # 通过监听滑条移动来动态调整实现VersionItem的FloatBar工具栏与列表相对静止
+            self.hover_item: Migrate.VersionItem = None
+            self.h_scroll_value = 0
+            self.scroll_max = self.horizontalScrollBar().maximum()
+            self.scroll_pagestep = self.horizontalScrollBar().pageStep()
+            
+            self.horizontalScrollBar().valueChanged.connect(self.on_scroll)
+        
+        # 保持水平移动列表时，悬浮工具栏仍可以相对固定列表靠右处
+        def on_scroll(self, value: int):
+            self.h_scroll_value = value
+            if self.hover_item:
+                self.hover_item.float_bar.move(self.viewport().width() - self.hover_item.float_bar.width() - 10 + value, 5)
+        
+        def add_version(self, version_item: 'Migrate.VersionItem'):
+            item = QtWidgets.QListWidgetItem()
+            self.addItem(item)
+            item.setSizeHint(version_item.sizeHint())
+            self.setItemWidget(item, version_item)
+        
+        def update_versions(self, versions: list[dict]):
+            self.clear()
+            for ver in versions:
+                self.add_version(Migrate.VersionItem(ver, self))
+            logging.info("已更新版本列表")
 
     class VersionItem(QtWidgets.QWidget):
         def __init__(self, json: dict, parent_list: 'Migrate.VersionList'):
@@ -295,7 +336,7 @@ class Migrate(SendMessageable):
             self.info_detail_layout.addStretch()
 
             # 悬浮操作栏
-            self.float_bar = Migrate.VersionItem.FloatBar(self, self.list.parent())
+            self.float_bar = Migrate.VersionItem.FloatBar(self, self.list.main_window)
 
         def resizeEvent(self, event): # 这里存放根据卡片大小来确定自身大小的widget
             self.float_bar.setFixedSize(50, self.height()-10)
@@ -387,29 +428,27 @@ class Migrate(SendMessageable):
                     self.main_window.message.error('无法打开文件夹，可能版本文件夹本体已被删除！')
             
             def delete_ver(self):
-                def delete(dialog: Dialog.DialogWindow):
+                def delete():
                     try:
                         # 从列表中移除目标条目
                         try:
-                            self.main_window.versions.remove(self.parent_item.json)
+                            self.main_window.games.remove(self.parent_item.json)
                         except ValueError:
                             self.main_window.message.info("未在列表中找到该版本，已跳过移除。")
-                            dialog.close_with_animation()
                             return
 
                         # 写回文件
                         with Path('versions.json').open('w', encoding='utf-8') as f:
-                            json.dump(self.main_window.versions, f, ensure_ascii=False, indent=2)
+                            json.dump(self.main_window.games, f, ensure_ascii=False, indent=2)
 
                         # 如果全删完了，就切换为欢迎界面
-                        if self.main_window.versions == []:
+                        if self.main_window.games == []:
                             self.main_window.terminal.switch_window(Terminal.WindowEnum.WELCOME)
-                            dialog.close_with_animation()
                             
                         # 更新界面列表（同时更新源和目标列表）
                         try:
-                            self.main_window.ver_list_source.update_versions(self.main_window.versions)
-                            self.main_window.ver_list_target.update_versions(self.main_window.versions)
+                            self.parent_item.list_source.update_versions(self.main_window.games)
+                            self.main_window.game_view_target.update_versions(self.main_window.games)
                         except Exception:
                             logging.exception("更新版本列表 UI 时出错")
 
@@ -422,13 +461,12 @@ class Migrate(SendMessageable):
                     except Exception as e:
                         logging.exception("移除版本时发生未知错误")
                         self.main_window.message.error(f"移除版本失败：{e}")
-
                     self.main_window.message.done("已成功移除 ！")
-                    dialog.close_with_animation()
-                dialog: Dialog.DialogWindow = self.main_window.dialog.warning(
+
+                self.main_window.dialog.warning(
                     "确定要从列表中移除该版本吗？",
                     "在列表中移除该版本不会对游戏文件产生影响。",
-                    ("确定", Dialog.Level.ERROR, lambda: delete(dialog))
+                    ("确定", Dialog.Level.ERROR, delete)
                 )
 
             def display_ui(self):
@@ -447,48 +485,186 @@ class Migrate(SendMessageable):
                 self.anim.finished.connect(self.hide)
                 self.anim.start()
                 self.show()  # 确保在动画期间可见
-
-    class GameFolderSelection(WidgetLibs.CollapsibleBox):
-        def __init__(self, text, parent=None, fold_when_clicked_item=True):
-            super().__init__(text, parent, fold_when_clicked_item=fold_when_clicked_item)
-
-    class VersionList(QtWidgets.QListWidget):
-        def __init__(self, version_list: list[dict], parent_widget=None):
-            super().__init__(parent=parent_widget)
-            # 样式设置
-            for version in version_list:
-                self.add_version(Migrate.VersionItem(version, self))
-            self.setStyleSheet(resource_path(load_stylesheet(resource_path("qss/migrate.qss"))))
-            self.setSpacing(5)
-
-            # 游戏文件夹列表
-
-            # 通过监听滑条移动来动态调整实现VersionItem的FloatBar工具栏与列表相对静止
-            self.hover_item: Migrate.VersionItem = None
-            self.h_scroll_value = 0
-            self.scroll_max = self.horizontalScrollBar().maximum()
-            self.scroll_pagestep = self.horizontalScrollBar().pageStep()
             
-            self.horizontalScrollBar().valueChanged.connect(self.on_scroll)
+    class GameView(QtWidgets.QFrame):
+        def __init__(self, game_list: list[dict], parent, main_window: 'Migrate'):
+            super().__init__(parent)
+            self.setLayout(QtWidgets.QVBoxLayout())
+            self.layout().setContentsMargins(2,2,2,2)
+            self.layout().setSpacing(0)
+            self.game_list = game_list # 游戏文件夹json
+            self.current_game: dict = self.game_list[0]
+            self.current_version: dict = None
+
+            # 游戏文件夹选项
+            self.game_selector = Migrate.GameSelector(self.current_game['name'], self, main_window)
+            self.layout().addWidget(self.game_selector)
+
+            # 版本列表
+            self.version_list = Migrate.VersionList(self.current_game['versions'], self)
+            self.layout().addWidget(self.version_list)
+
+            # 将选中的游戏版本信息的信号，绑定给版本列表
+            self.game_selector.selected.connect(self.switch_game)
+            self.version_list.itemChanged.connect()
+
+        def switch_game(self, game_dict: dict):
+            self.current_game = game_dict
+            self.version_list.update_versions(self.current_game['versions'])
+            self.game_selector.set_text(game_dict['name'])
+
+        def update_versions(self, ):
+
+    class GameSelector(WidgetLibs.CollapsibleBox):
+        def __init__(self, text, parent, main_window: 'Migrate', fold_when_clicked_item=True):
+            super().__init__(text, parent, fold_when_clicked_item=fold_when_clicked_item)
+            self.list = Migrate.GameSelector.GameList(self, main_window)
         
-        # 保持水平移动列表时，悬浮工具栏仍可以相对固定列表靠右处
-        def on_scroll(self, value: int):
-            self.h_scroll_value = value
-            if self.hover_item:
-                self.hover_item.float_bar.move(self.viewport().width() - self.hover_item.float_bar.width() - 10 + value, 5)
+        def add_item(self, text, data=None):
+            self.list.add_item(text, data)
         
-        def add_version(self, version_item: 'Migrate.VersionItem'):
-            item = QtWidgets.QListWidgetItem()
-            self.addItem(item)
-            item.setSizeHint(version_item.sizeHint())
-            self.setItemWidget(item, version_item)
-        
-        def update_versions(self, versions: list[dict]):
-            self.clear()
-            for ver in versions:
-                self.add_version(Migrate.VersionItem(ver, self))
-            logging.info("已更新版本列表")
-    
+        class GameList(WidgetLibs.CollapsibleBox.ItemList):
+            def __init__(self, parent, main_window, max_height = 200, fixed_width = 240):
+                super().__init__(parent, max_height, fixed_width)
+                self.main_window = main_window
+                self.hover_item: Migrate.GameSelector.GameItem
+                self.horizontalScrollBar().valueChanged.connect(self.on_scroll)
+
+            def add_item(self, text, data=None):
+                item = Migrate.GameSelector.GameItem(text, data, self, self.main_window)
+                self.container.layout().addWidget(item)
+            
+            # 保持水平移动列表时，悬浮工具栏仍可以相对固定列表靠右处
+            def on_scroll(self, value: int):
+                self.h_scroll_value = value
+                if self.hover_item:
+                    self.hover_item.float_bar.move(self.viewport().width() - self.hover_item.float_bar.width() - 10 + value, 5)
+
+
+        class GameItem(WidgetLibs.CollapsibleBox.Item):
+            def __init__(self, text, data: dict, parent: WidgetLibs.CollapsibleBox.ItemList, main_window: 'Migrate'):
+                super().__init__(text, data, parent)
+                self.float_bar = Migrate.GameSelector.GameItem.FloatBar(self, main_window)
+
+            def enterEvent(self, event):
+                self.float_bar.display_ui()
+                return super().enterEvent(event)
+
+            def leaveEvent(self, event):
+                self.float_bar.hide_ui()
+                return super().leaveEvent(event)
+
+            class FloatBar(QtWidgets.QFrame):
+                def __init__(self, parent_widget: 'Migrate.GameSelector.Item', main_window: 'Migrate'):
+                    super().__init__(parent_widget)
+                    self.parent_item = parent_widget
+                    self.main_window = main_window
+                    # 总样式设置
+                    self.setLayout(QtWidgets.QHBoxLayout())
+                    self.setContentsMargins(0,0,0,0)
+                    self.layout().setSpacing(2)
+
+                    self.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Expanding)
+                    self.setObjectName('float_bar')
+                    self.setStyleSheet(load_stylesheet(resource_path('qss/migrate.qss')))
+
+                    # 打开文件夹
+                    # 按钮
+                    self.folder_btn = QtWidgets.QPushButton()
+                    self.folder_btn.setObjectName('folder_btn')
+                    self.folder_btn.setStyleSheet(load_stylesheet(resource_path('qss/migrate.qss')))
+                    self.folder_btn.setContentsMargins(0,0,0,0)
+                    self.folder_btn.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+                    self.folder_btn.setToolTip('打开该游戏文件夹')
+                    self.folder_btn.clicked.connect(self.open_folder)
+                    self.folder_btn.setIcon(QtGui.QIcon(resource_path('assets/folder.svg')))
+                    self.layout().addWidget(self.folder_btn)
+
+                    # 删除键
+                    # 按钮
+                    self.del_btn = QtWidgets.QPushButton()
+                    self.del_btn.setObjectName('del_btn')
+                    self.del_btn.setStyleSheet(load_stylesheet(resource_path('qss/migrate.qss')))
+                    self.del_btn.setContentsMargins(0,0,0,0)
+                    self.del_btn.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+                    self.del_btn.setToolTip('从列表中移除该游戏文件夹（不会删除本体文件）')
+                    self.del_btn.clicked.connect(self.delete_ver)
+                    self.layout().addWidget(self.del_btn)
+                    # icon
+                    self.del_btn.setIcon(QtGui.QIcon(resource_path('assets/delete.svg')))
+
+                    self.opacity_effect = QtWidgets.QGraphicsOpacityEffect(self)
+                    self.opacity_effect.setOpacity(0.0)
+                    self.setGraphicsEffect(self.opacity_effect)
+                    self.hide()
+
+                def open_folder(self):
+                    path = Path(self.parent_item.data['path'])
+                    if Path.exists(path):
+                        QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(path.as_posix()))
+                    else:
+                        self.main_window.message.error('无法打开文件夹，可能游戏文件夹本体已被删除！')
+                
+                def delete_ver(self):
+                    def delete():
+                        try:
+                            # 从列表中移除目标条目
+                            try:
+                                self.main_window.games.remove(self.parent_item.data)
+                            except ValueError:
+                                self.main_window.message.info("未在列表中找到该游戏文件夹，已跳过移除。")
+                                return
+
+                            # 写回文件
+                            with Path('versions.json').open('w', encoding='utf-8') as f:
+                                json.dump(self.main_window.games, f, ensure_ascii=False, indent=2)
+
+                            # 如果全删完了，就切换为欢迎界面
+                            if self.main_window.games == []:
+                                self.main_window.terminal.switch_window(Terminal.WindowEnum.WELCOME)
+                                
+                            # 更新界面列表（同时更新源和目标列表）
+                            try:
+                                self.main_window.ver_list_source.update_versions(self.main_window.games)
+                                self.main_window.game_view_target.update_versions(self.main_window.games)
+                            except Exception:
+                                logging.exception("更新版本列表 UI 时出错")
+
+                        except (OSError, IOError) as e:
+                            logging.exception("文件操作失败")
+                            self.main_window.message.error(f"文件操作失败：{e}")
+                        except json.JSONDecodeError as e:
+                            logging.exception("JSON 解析失败")
+                            self.main_window.message.error(f"读取版本列表失败：{e}")
+                        except Exception as e:
+                            logging.exception("移除时发生未知错误")
+                            self.main_window.message.error(f"移除游戏文件夹失败：{e}")
+
+                        self.main_window.message.done("已成功移除 ！")
+                    self.main_window.dialog.warning(
+                        "确定要从列表中移除该游戏文件夹吗？",
+                        "在列表中移除该游戏文件夹不会对本体文件产生影响。",
+                        ("确定", Dialog.Level.ERROR, lambda: delete),
+                        close_when_clicked_any_btn=True
+                    )
+
+                def display_ui(self):
+                    self.show()
+                    self.anim = QtCore.QPropertyAnimation(self.graphicsEffect(), b"opacity")
+                    self.anim.setDuration(60)
+                    self.anim.setStartValue(self.graphicsEffect().opacity())
+                    self.anim.setEndValue(1.0)
+                    self.anim.start()
+
+                def hide_ui(self):
+                    self.anim = QtCore.QPropertyAnimation(self.graphicsEffect(), b"opacity")
+                    self.anim.setDuration(60)
+                    self.anim.setStartValue(self.graphicsEffect().opacity())
+                    self.anim.setEndValue(0.0)
+                    self.anim.finished.connect(self.hide)
+                    self.anim.start()
+                    self.show()  # 确保在动画期间可见
+
     
             
 class ButtonMigrateDetail(QtWidgets.QPushButton):

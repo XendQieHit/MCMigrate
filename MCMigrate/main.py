@@ -83,17 +83,20 @@ terminal.dialog_series_requested.connect(window.dialog.ask_in_series)
 
 # 加载界面
 if os.path.exists("versions.json") and os.path.getsize("versions.json") > 0:
-        try:
-            if (version_paths:= version.get_versions()) == []: 
-                window.setCentralWidget(Welcome(terminal=terminal))
-            else:
-                migrate = Migrate(terminal=terminal, version_paths=version_paths)
-                window.setCentralWidget(migrate)
-                logging.info(migrate)
-        except json.JSONDecodeError:
-            logging.error("解析versions.json文件失败")
-            welcome = Welcome(terminal=terminal)
-            window.setCentralWidget(welcome)
+    versions = version.get_versions()
+    try:
+        if versions == []: 
+            window.setCentralWidget(Welcome(terminal=terminal))
+        else:
+            if not versions[0].get('versions', None): # 升级旧版本versions.json
+                versions = version.upgrade_versions_json()
+            migrate = Migrate(terminal=terminal, version_paths=versions)
+            window.setCentralWidget(migrate)
+            logging.info(migrate)
+    except json.JSONDecodeError:
+        logging.error("解析versions.json文件失败")
+        welcome = Welcome(terminal=terminal)
+        window.setCentralWidget(welcome)
 else:
     welcome = Welcome(terminal=terminal)
     window.setCentralWidget(welcome)
