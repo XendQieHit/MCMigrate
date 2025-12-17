@@ -157,23 +157,21 @@ QFrame#float_bar {
     background-color: transparent;
     padding: 0px
 }
-QFrame#float_bar > QPushButton#del_btn {
-    padding: 0px;
+QPushButton#del_btn {
     background-color: '#88d52d0f'
 }
-QFrame#float_bar > QPushButton#del_btn:hover {
+QPushButton#del_btn:hover {
     background-color: '#dbe33a3d'
 }
-QFrame#float_bar > QPushButton#del_btn:pressed {
+QPushButton#del_btn:pressed {
     background-color: '#e4ce213e'
 }
-QFrame#float_bar > QPushButton#folder_btn {
-    padding: 0px;
+QPushButton#folder_btn {
     background-color: '#92e9ba2e'
 }
-QFrame#float_bar > QPushButton#folder_btn:hover {
+QPushButton#folder_btn:hover {
     background-color: '#deffcf3e'
 }
-QFrame#float_bar > QPushButton#folder_btn:pressed {
+QPushButton#folder_btn:pressed {
     background-color: '#dfc99b3e'
 }

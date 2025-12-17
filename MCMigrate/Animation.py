@@ -14,7 +14,7 @@ class FadeIn(QtCore.QPropertyAnimation):
         widget.setGraphicsEffect(self.effect)
         super().__init__(self.effect, b"opacity")
         self.setDuration(duration)
-        self.setStartValue(0.0)
+        self.setStartValue(self.effect.opacity())
         self.setEndValue(1.0)
         self.setEasingCurve(QtCore.QEasingCurve.InOutQuad)
 

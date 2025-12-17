@@ -1,5 +1,5 @@
 from pathlib import Path
-import os, sys, shutil, logging
+import os, sys, shutil, logging, json
 
 def clean_log_folder(LOG_DIR: str):
     '''清理logs，维持日志文件数量在7个'''
@@ -26,3 +26,38 @@ def load_stylesheet(path):
     except Exception as e:
         logging.error(f"加载样式表失败: {e}")
         return ""
+    
+def get_app_state() -> dict:
+    '''获取用户上次关闭程序时的窗口状态'''
+    try:
+        with open('app_state.json', 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return new_app_state()
+    
+def new_app_state() -> dict:
+    '''生成初始的app_state.json文件'''
+    default_state = {
+        "migrate": {
+            "window_size": [1024, 768],
+            "splitter_state": None,
+            "latest_game_folder_path": None
+        }
+    }
+    with open('app_state.json', 'w', encoding='utf-8') as f:
+        json.dump(default_state, f, indent=4)
+    return default_state
+
+def save_app_state(state: dict):
+    '''保存当前窗口状态到app_state.json'''
+    with open('app_state.json', 'w', encoding='utf-8') as f:
+        json.dump(state, f, indent=4)
+
+def modify_app_state(value, *keys):
+    '''修改app_state.json中的指定键值'''
+    state = get_app_state()
+    current = state
+    for key in keys[:-1]:
+        current = current[key]
+    current[keys[-1]] = value
+    save_app_state(state)

@@ -7,7 +7,7 @@ import os, sys, logging, time, json, core.func
 from windows.Migrate import Migrate
 from windows.Welcome import Welcome
 from windows.MainWindow import MainWindow
-from message import Dialog
+from message import Dialog, Message
 
 # 配置日志文件夹
 BASE_DIR = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
@@ -40,7 +40,7 @@ core.func.clean_log_folder(LOG_DIR)
         
 # 初始化主窗口
 app = QtWidgets.QApplication([])
-window = MainWindow()
+window = MainWindow(app)
 window.setWindowTitle("MCMigrator")
 window.setWindowIcon(QtGui.QIcon(core.func.resource_path("assets/icon_64x64.png")))
 window.resize(800, 400)
@@ -81,25 +81,44 @@ terminal.message_requested.connect(window.message.show_message)
 terminal.dialog_requested.connect(show_dialog_slot)
 terminal.dialog_series_requested.connect(window.dialog.ask_in_series)
 
+def show_welcome():
+    window.setCentralWidget(Welcome(terminal=terminal))
+
 # 加载界面
 if os.path.exists("versions.json") and os.path.getsize("versions.json") > 0:
     versions = version.get_versions()
     try:
         if versions == []: 
-            window.setCentralWidget(Welcome(terminal=terminal))
+            show_welcome()
         else:
-            if not versions[0].get('versions', None): # 升级旧版本versions.json
-                versions = version.upgrade_versions_json()
-            migrate = Migrate(terminal=terminal, version_paths=versions)
-            window.setCentralWidget(migrate)
-            logging.info(migrate)
+            try:
+                if isinstance(versions[0].get('versions', None), dict): # 升级旧版本versions.json
+                    versions = version.upgrade_versions_json()
+                migrate = Migrate(terminal=terminal)
+                window.setCentralWidget(migrate)
+            except (ValueError, KeyError):
+                logging.error("解析versions.json文件失败")
+                show_welcome()
+                terminal.send_message("加载版本列表失败：解析versions.json文件失败", Message.Level.ERROR)
     except json.JSONDecodeError:
         logging.error("解析versions.json文件失败")
-        welcome = Welcome(terminal=terminal)
-        window.setCentralWidget(welcome)
+        show_welcome()
+        terminal.send_message("加载版本列表失败：解析versions.json文件失败", Message.Level.ERROR)
 else:
-    welcome = Welcome(terminal=terminal)
-    window.setCentralWidget(welcome)
-    logging.info(welcome)
+    show_welcome()
+    terminal.send_message("加载版本列表失败：解析versions.json文件失败", Message.Level.ERROR)
 window.show()
+
+# 用户操作记录部分
+# 读取窗口大小记录
+try:
+    window.resize(*core.func.get_app_state()['window_size'])
+except Exception:
+    pass
+# 监听窗口大小变化以记录操作
+window.resizeEvent = lambda event: (
+    QtWidgets.QMainWindow.resizeEvent(window, event),
+    core.func.modify_app_state([window.width(), window.height()], 'window_size')
+)
+
 sys.exit(app.exec())

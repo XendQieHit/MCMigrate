@@ -241,7 +241,7 @@ class DialogSeries(QtCore.QObject):
         self.current_dialog_tree = dialog_tree
         self.current_dialog_tree.ended.connect(lambda: self.finished.emit(self.temp_data))
         self.current_dialog_tree.next_to.connect(self.next_to)
-        logging.info(f"DialogSeries: set current_dialog_tree to {dialog_tree.name}")
+        logging.debug(f"DialogSeries: set current_dialog_tree {self.current_dialog_tree} to {dialog_tree.name}")
         return self.current_dialog_tree
     
     @QtCore.Slot(int)
@@ -257,7 +257,7 @@ class DialogSeries(QtCore.QObject):
         '''
         用于标记点击按钮之后的页面操作
         例：
-        next_action = Action("NEXT", 3) -> 跳转至第二个子节点（以数组索引的形式）
+        next_action = Action("NEXT", 2) -> 跳转至第三个子节点（以数组索引的形式）
         end_action = Action("END") -> 结束问答
         stay_action = Action("STAY") -> 保持窗口（其实除上面两个，其他Action都会被仍为时保持窗口
         '''
@@ -271,6 +271,7 @@ class DialogSeries(QtCore.QObject):
         \n例：
         \nfunc = Func(set_value=True, key_in_temp_data=('osu', 'is_std'))
         \n-> 将 temp_data['osu']['is_std'] 的值设为 True
+        \n若key_in_temp_data是数组list，且最后一个key值为None，则会自动将set_value添加（append）到该数组
         Args:
             set_value(Any): 要设置成的值
             key_in_temp_data:(tuple[Any]): 要改变值的键名，当然也支持数组索引
@@ -350,17 +351,25 @@ class DialogSeries(QtCore.QObject):
             '''
             # 设置按钮点击后修改 temp_data 中对应路径的值
             def set_value(data, path, val):
-                logging.info(data)
-                for key in path[:-1]:
-                    data = data[key]
-                if isinstance(data, list): # 兼容数组
-                    data.append(val)
-                else: data[path[-1]] = val
+                # Iterable
+                if isinstance(path, Iterable):
+                    for key in path[:-1]:
+                        data = data[key]
+                    if isinstance(data, list) and path[-1] is None: # 兼容数组append操作
+                        data.append(val)
+                    else: data[path[-1]] = val
+                else: raise TypeError(f'Func的key_in_temp_data不是可遍历的对象: {type(path)}')
+
 
             def exec_funcs():
                 for func in funcs:
-                    if func.set_value is not None and func.key_in_temp_data:
-                        set_value(self.temp_data, func.key_in_temp_data, func.set_value)
+                    if func.set_value is not None and func.key_in_temp_data is not None: # 原来python里0是被认作是false的啊？！
+                        try:
+                            set_value(self.temp_data, func.key_in_temp_data, func.set_value)
+                        except TypeError as e:
+                            logging.error(str(e))
+                    else:
+                        raise ValueError(f'检验Func参数不合格，再去练练吧：{func.set_value, func.key_in_temp_data}')
             btn = DialogSeries.DialogSeriesButton(self, text, level, action, exec_funcs, **kwargs)
             self.button_section.layout().addWidget(btn)
             self.dialog_buttons.append(btn)

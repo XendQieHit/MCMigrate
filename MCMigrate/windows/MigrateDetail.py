@@ -79,11 +79,11 @@ class MigrateDetail(SendMessageable):
     @QtCore.Slot()
     def terminate(self):
         self.dialog.current_dialog.close_with_animation()
-        self.terminal.switch_window_with_msg(Terminal.WindowEnum.MIGRATE, ('已终止迁移任务', Message.Level.INFO), self.terminal.versions_json)
+        self.terminal.switch_window_with_msg(Terminal.WindowEnum.MIGRATE, ('已终止迁移任务', Message.Level.INFO))
 
     @QtCore.Slot()
     def back(self):
-        self.terminal.switch_window(Terminal.WindowEnum.MIGRATE, self.terminal.versions_json, self.terminal.task_migrate)
+        self.terminal.switch_window(Terminal.WindowEnum.MIGRATE, self.terminal.task_migrate)
 
     @QtCore.Slot(int, int)
     def update_tasks(self, pending_num_mod, pending_num_file):

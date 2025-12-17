@@ -60,9 +60,12 @@ class Welcome(SendMessageable):
         self.resize(800, 400)
 
     def button_import_clicked(self):
-        if versions := self.terminal.import_version():
-            self.terminal.switch_window_with_msg(Terminal.WindowEnum.MIGRATE, ("版本导入成功！", Message.Level.DONE), versions)
+        if self.terminal.import_version():
+            self.terminal.switch_window_with_msg(Terminal.WindowEnum.MIGRATE, ("版本导入成功！", Message.Level.DONE))
 
     def button_import_pcl_clicked(self):
-        if versions:= self.terminal.import_versions_from_pcl():
-            self.terminal.switch_window_with_msg(Terminal.WindowEnum.MIGRATE, ("版本导入成功！", Message.Level.DONE), versions)
+        try:
+            if self.terminal.import_versions_from_pcl():
+                self.terminal.switch_window_with_msg(Terminal.WindowEnum.MIGRATE, ("版本导入成功！", Message.Level.DONE))
+        except MCException.VersionsJSONFileError as e:
+            self.message.error(str(e))

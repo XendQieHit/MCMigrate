@@ -4,9 +4,11 @@ MCMigrate/test.py
 MCMigrate/exclude.txt
 MCMigrate/func/__pycache__
 MCMigrate/logs
+app_state.json
 versions.json
 config.yml
 .vscode
+text.py
 UI设计图
 build
 dist
