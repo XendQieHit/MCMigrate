@@ -15,7 +15,7 @@ LOG_DIR = os.path.join(BASE_DIR, 'logs')
 LOG_FILE = os.path.join(LOG_DIR, f"{time.strftime('%Y-%m-%d')}.log")
 os.makedirs(LOG_DIR, exist_ok=True)
 logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 handler = TimedRotatingFileHandler(
     filename=os.path.join(LOG_FILE),
     when="midnight",
@@ -92,14 +92,16 @@ if os.path.exists("versions.json") and os.path.getsize("versions.json") > 0:
             show_welcome()
         else:
             try:
-                if isinstance(versions[0].get('versions', None), dict): # 升级旧版本versions.json
-                    versions = version.upgrade_versions_json()
                 migrate = Migrate(terminal=terminal)
                 window.setCentralWidget(migrate)
             except (ValueError, KeyError):
                 logging.error("解析versions.json文件失败")
                 show_welcome()
                 terminal.send_message("加载版本列表失败：解析versions.json文件失败", Message.Level.ERROR)
+            except Exception as e:
+                logging.error(f"加载主界面时发生错误：{e}")
+                show_welcome()
+                terminal.send_message(f"加载主界面时发生错误：{e}", Message.Level.ERROR)
     except json.JSONDecodeError:
         logging.error("解析versions.json文件失败")
         show_welcome()

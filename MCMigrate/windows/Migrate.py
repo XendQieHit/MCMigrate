@@ -31,7 +31,7 @@ class Migrate(SendMessageable):
         self.top_bar.layout().addWidget(self.window_title, 1)
         self.top_bar.setFixedHeight(self.window_title.height())
         self.top_bar.layout().addStretch()
-        self.top_bar.layout().setContentsMargins(0,0,0,0)
+        self.top_bar.layout().setContentsMargins(2,0,2,0)
         # 刷新全部版本按钮
         self.refresh_all_vers_btn = WidgetLibs.TransparentColorButton(QtGui.QColor("#77D380"), QtGui.QColor("#4BBD68"), resource_path("assets/refresh.svg"), '刷新所有版本信息', self)
         self.refresh_all_vers_btn.clicked.connect(lambda: self.dialog.info(
@@ -127,11 +127,14 @@ class Migrate(SendMessageable):
                 if target:= self.terminal.get_game_by_path(latest_game_folder_path['target']):
                     self.game_view_target.switch_game_by_dict(target)
         except Exception:
-            pass
+            logging.warning('加载app_state.json读取历史操作状态失败，使用默认设置')
         ## 关联切换游戏目录信号以记录操作
         def save_latest_game_folder_path(game_item: GameSelector.GameItem, is_source: bool):
             state = get_app_state()
-            latest_game_folder_path = state['migrate'].get('latest_game_folder_path', {'source': None, 'target': None})
+            latest_game_folder_path = state['migrate'].get('latest_game_folder_path', None)
+            if latest_game_folder_path is None:
+                latest_game_folder_path = {'source': None, 'target': None}
+            logging.debug(f"latest_game_folder_path: {latest_game_folder_path}")
             if is_source:
                 latest_game_folder_path['source'] = game_item.data['folder_path']
             else:

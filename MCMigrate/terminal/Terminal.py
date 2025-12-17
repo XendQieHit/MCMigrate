@@ -21,8 +21,16 @@ class Terminal(Message.Messageable, Dialog.Dialogable):
         self.task_migrate = None
 
         # versions.json索引部分
-        self.versions_manager = VersionsJsonManager(self)
-    
+        try:
+            self.versions_manager = VersionsJsonManager(self)
+        except KeyError:
+            games_json = version.get_versions()
+            if not isinstance(games_json[0].get('versions', None), dict) and isinstance(games_json[0].get('game_jar', None), str): # 升级旧版本versions.json
+                version.update_versions_json()
+            else: # versions.json格式又炸了, 重置
+                version.gen_new_versions()
+                self.send_message('加载versions.json文件时出错，已重置文件')
+            self.versions_manager = VersionsJsonManager(self)
     # == 前端封装方法 ==
 
     def import_version(self) -> list[dict] | None:
